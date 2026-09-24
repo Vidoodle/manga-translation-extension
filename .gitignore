@@ -1,0 +1,11 @@
+# Temporary work, local credentials and generated packages stay out of review.
+/work/
+**/.env
+**/.env.*
+!**/.env.example
+**/.local/
+**/__pycache__/
+*.pyc
+**/node_modules/
+**/test-results/
+/outputs/*.zip
