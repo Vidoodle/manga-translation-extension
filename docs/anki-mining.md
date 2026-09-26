@@ -1,6 +1,6 @@
 # Anki word mining
 
-Implemented in version 0.5.0, with optional onboarding in 0.5.1. Mining reuses your translation without another model request.
+Save vocabulary from a translation to your own Anki deck, without another model request.
 
 ## Setup
 
@@ -11,7 +11,7 @@ Implemented in version 0.5.0, with optional onboarding in 0.5.1. Mining reuses y
 
 For Basic notes, the default is **Word → Front** and **Reading, Meaning, Japanese context, Full translation → Back**. Specialized vocabulary note types can keep values separate. Unmapped fields stay empty except for the derived Kaishi fields described below. Your existing card templates determine what appears when studying. Deck/template creation and cloze generation are not included.
 
-### Kaishi cards (0.5.5)
+### Kaishi cards
 
 Kaishi's field schema is recognized automatically, including cloned note types. Setup suggests Word → Word, Reading → Word Reading, Meaning → Word Meaning, Japanese context → Sentence, and Full translation → Sentence Meaning. Existing mappings with Reading → Word Furigana also work without reconfiguration.
 
@@ -46,8 +46,4 @@ If you configured an AnkiConnect API key, enter it under the optional key disclo
 - **Fields changed:** reconnect and save a new mapping.
 - **No confirmation:** the note may already exist. Check Anki before retrying. Add stays disabled for that word in the current reader session; close and reactivate the reader after checking if another attempt is needed. There are no automatic retries or offline queue.
 
-## Verification
-
-The v6 contract and handshake were checked against the [official API source](https://github.com/FooSoft/anki-connect/blob/master/plugin/__init__.py) and [origin handling](https://github.com/FooSoft/anki-connect/blob/master/plugin/web.py). That archived repository points to [SourceHut](https://git.sr.ht/~foosoft/anki-connect), which could not be retrieved here.
-
-Automated checks cover mapping, escaping, full context, duplicates, concurrent clicks, permissions, offline and unknown outcomes, and reader ownership. Browser fixtures cover configuration, editing and add feedback with simulated Anki responses. Version 0.5.5 was also checked through live AnkiConnect: the production add service created one temporary note using the user's Kaishi type and existing field mapping; Anki's rendered card HTML confirmed ruby readings, Japanese context on both sides and spacing. The temporary note was removed and removal confirmed. Existing notes and templates were not edited. The maintainer has exercised the extension in Firefox/BookWalker. The coding agent could not independently automate that browser because its computer-use tool lacked Firefox URL-policy support.
+For test coverage and integration results, see the [testing guide](validation.md).

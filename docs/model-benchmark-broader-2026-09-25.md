@@ -23,7 +23,7 @@ Accepted means usable by the extension's validator, not linguistically correct. 
 
 Completion measures the full response and validation. Failed attempts remain included: DeepSeek's final response was rejected after 95.05 seconds; its seven accepted responses had a 43.34-second median. MiniMax's accepted-only median was 6.18 seconds. Other models' accepted-only medians equal the displayed medians. These tiny samples and varying provider routes do not establish general latency distributions.
 
-The cost projection divides reported cost by attempted calls, including charged validation failures, and multiplies by 1,000. It is not a cost per successful answer or a quote for larger pages. The earlier Gemini measurements occurred at a different time. We made no new baseline calls simply to obtain better scores.
+The cost projection divides reported cost by attempted calls, including charged validation failures, and multiplies by 1,000. It is not a cost per successful answer or a quote for larger pages. The Gemini baselines were reused from the earlier run and were not measured concurrently with these candidates.
 
 ## What matters in the answers
 
@@ -96,10 +96,6 @@ The eight [original crop fixtures](../benchmarks/casual-japanese/contact-sheet.p
 
 Rejected answers receive zero delivered-answer credit; unattempted cases remain unscored. Correct target kana can coexist with incorrect word divisions and definitions. Correct English can coexist with a meaning-reversing Japanese transcript. Those errors matter more than small changes in composite scores.
 
-## Local evidence
+## Reproduction
 
-Run: `broader-families-20260925`. The ignored local [metrics](../test-results/model-benchmark/broader-families-20260925/metrics.json), [first-half grades](../test-results/model-benchmark/broader-families-20260925/review-first-half-grades.json), and [second-half grades](../test-results/model-benchmark/broader-families-20260925/review-second-half-grades.json) preserve the measurements and review. `events.jsonl` contains every attempt, including failures; it was not rewritten to replace unsuccessful answers. These evidence files are local and will not exist in a fresh checkout.
-
-After this run, the offline benchmark observer was fixed to retain reported billing metadata on complete streams ending in rejection, including response limits and malformed JSON. Production validation still rejects them, and no automatic retry was added. That correction cannot recover the already-lost DeepSeek charge. Resume guards also reject changed references, changed attempted requests, and expanded cohorts that could reassign anonymous grading labels.
-
-This exercises the production provider from Node. It does not establish installed Firefox/BookWalker compatibility.
+See the [broader screening configuration](../benchmarks/casual-japanese/broader-screening.md) and [runner instructions](../benchmarks/casual-japanese/README.md). Original raw responses and grading files are not distributed with this repository. New runs produce local metrics and event logs, including failed attempts, and incur API charges. The current runner retains reported billing metadata for rejected responses; the missing DeepSeek charge in this report remains unknown.

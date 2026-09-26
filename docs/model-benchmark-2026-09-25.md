@@ -72,6 +72,4 @@ The paid `qwen/qwen3.8-flash` endpoint returned HTTP 429 on its first attempt. I
 
 The [runner instructions](../benchmarks/casual-japanese/README.md) describe paid execution, budget checks, resume behavior and offline summarization. Credentials stay in ignored `.env`; raw responses and generation metadata stay under ignored `test-results/`.
 
-This local run is `casual-japanese-20260925`. Its [metrics](../test-results/model-benchmark/casual-japanese-20260925/metrics.json), [first-half grades](../test-results/model-benchmark/casual-japanese-20260925/review-first-half-grades.json), [second-half grades](../test-results/model-benchmark/casual-japanese-20260925/review-second-half-grades.json), and [adjudication notes](../test-results/model-benchmark/casual-japanese-20260925/adjudication.json) preserve the evidence. These local links will not exist in a fresh checkout. `events.jsonl` in that directory contains all attempts, including failures.
-
-The full offline suite passes **255 tests**, including eight benchmark-runner regressions for request fidelity, credential redaction, dry runs, budget enforcement and avoiding duplicate paid requests. Formatting checks pass. These development checks make no paid requests.
+The original raw responses and grading files are not distributed with this repository. The tables above summarize the recorded results; a new run will produce its own output files and incur its own API charges.

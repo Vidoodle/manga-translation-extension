@@ -1,6 +1,6 @@
 # Manga Reading Assistant
 
-**Product and design · 25 September 2026**
+**Product and design**
 
 **First target:** desktop Firefox, Japanese-to-English, inside BookWalker.
 
@@ -33,7 +33,7 @@ The popup contains welcome, key, model, settings and reset confirmation screens.
 
 The model screen automatically refreshes its catalog and prices whenever entered. Show **Retry model list** only after a failed load. Clearly label a cached fallback or unknown prices. Recommended starting models are joined against the available catalog; no model is selected automatically. Keep other compatible models searchable under **All models**.
 
-The current shortlist is Gemini 3 Flash Preview, Gemini 3.1 Pro Preview and Claude Opus 4.6, spanning published prices and capabilities. This is not a verified ranking of manga translation quality. Model choice remains in popup settings. Changing it affects future requests and never regenerates a saved translation.
+The suggested models are Gemini 3 Flash Preview for learner explanations and Gemini 3.1 Flash-Lite for lower cost and shorter waits, based on the [model screening](model-benchmark-2026-09-25.md). The screening uses a small set of synthetic crops and is not a comprehensive manga translation ranking. Model choice remains in popup settings. Changing it affects future requests and never regenerates a saved translation.
 
 The reset control in Settings opens a separate confirmation screen. Confirming **Reset connection** removes the key and model choice; Cancel changes nothing. Saved translations, running work, the shortcut and card position remain. This user action is separate from the one-time data migration below.
 
@@ -56,7 +56,7 @@ The document port and heartbeat support work during normal popup/card dismissal.
 
 Only the selected crop is sent for a new translation. Full screenshots stay local and are not retained as page references. The selected crop and answer are stored locally for history and exact request reuse. The key is kept in local extension settings, outside the reading page; it is not encrypted at rest or synced.
 
-The database upgrade for this release clears old completed answers, page references and region placements once. It retains non-completed request records, their claims, and source translations needed for deliberate retry. Key and settings are separate and remain intact. Later startups keep new saved translations, subject to ordinary retention limits.
+The version-3 database upgrade removes obsolete page and region stores while retaining translations and request records from version 2. Version-1 databases also receive the historical answer-format reset, preserving unresolved requests and required source translations. Keys and settings are separate and remain intact. See [migration and retention](architecture.md#migration-and-retention) for details.
 
 Ordinary answers remain bounded; active/unresolved requests and their required sources are protected. **Clear saved data** does not silently resubmit or discard unfinished work.
 
@@ -73,8 +73,6 @@ Ordinary answers remain bounded; active/unresolved requests and their required s
 | Duplicate clicks or overlapping activations | Preserve the latest UI and share matching request work                        |
 | Missing key or permission                   | Keep saved translations available; guide setup for new work                   |
 
-## Acceptance still needed
+## Testing
 
-Installed Firefox/BookWalker interaction, real capture alignment, drag/close behavior, fullscreen and background lifetime need an actual browser acceptance pass. The available computer-use tool rejected Firefox inspection because it cannot enforce its URL policy on that browser.
-
-A paid Gemini request and the user's reported provider failures have not been verified. Translation quality needs representative manga reviewed by a competent Japanese reader, with transcription, meaning, English and learning explanations assessed separately. Synthetic fixtures establish neither model quality nor live provider success.
+See the [testing guide](validation.md) for automated coverage, browser fixtures, recorded results and manual release checks. Translation-quality comparisons and their limitations are documented in the [model screening](model-benchmark-2026-09-25.md).

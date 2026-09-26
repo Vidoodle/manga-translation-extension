@@ -1,6 +1,6 @@
 # Pre-publication audit
 
-Completed September 26, 2026, before changing repository visibility. This is an audit for accidental disclosure, not a penetration test or a guarantee that every possible secret pattern can be detected.
+Completed September 26, 2026. This is an audit for accidental disclosure, not a penetration test or a guarantee that every possible secret pattern can be detected.
 
 ## Scope and result
 
@@ -28,12 +28,3 @@ The release ZIP's SHA-256 is `e5806508efd73758e6d3e8add625a7b074fe657b4d4350393c
 - Compared every extracted package file against source, checked archive checksums, and inspected PNG chunk types for embedded metadata.
 
 Raw downloads and redacted scan results are in ignored `work/publication-audit/`; they are not committed. The audit does not cover unreachable/deleted remote objects, private browser profiles, or external services' retained data. Future commits and attachments need their own check before publication.
-
-## Documentation prepared
-
-- [MIT license](../LICENSE), using the maintainer's public handle as the copyright holder.
-- [Privacy policy](../PRIVACY.md), checked against screenshot handling, OpenRouter requests, local storage, reset/clear behavior, and optional AnkiConnect requests.
-- [README](../README.md) with installation, setup, reading controls, Anki support, and separate OpenRouter usage costs.
-- Clarified that the maintainer's real Firefox/BookWalker use is distinct from limitations on the coding agent's browser automation.
-
-This work does not change GitHub visibility or Mozilla distribution. The existing `v0.5.6` release remains the original artifact; documentation and license changes are recorded under Unreleased.

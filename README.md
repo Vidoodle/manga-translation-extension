@@ -2,7 +2,7 @@
 
 Read Japanese manga with translations and word help alongside the page. Select a speech bubble to get its Japanese text, an English translation, hoverable word readings and meanings, and grammar points. Save words to Anki with their sentence and translation.
 
-Built for desktop Firefox and used during development with BookWalker, including continuous scrolling. Other reading sites may work; compatibility depends on the site's reader. Chrome and mobile browsers are not currently supported.
+Built for desktop Firefox and Japanese-to-English reading on BookWalker, including continuous scrolling. Other reading sites may work; compatibility depends on the site's reader. Chrome and mobile browsers are not currently supported.
 
 ## Get started
 
@@ -75,7 +75,7 @@ pnpm package
 
 `pnpm check` runs automated tests, formatting, version consistency, and Mozilla's extension linter. `pnpm package` produces an unsigned versioned ZIP and SHA-256 checksum in `dist/`.
 
-For browser fixtures, run `pnpm test:browser` and open `http://127.0.0.1:17843/reader` or `/idb`. These use synthetic page content and simulated model responses with no external model calls. The [validation record](docs/validation.md) distinguishes automated checks, live service checks, and hands-on Firefox feedback.
+For browser fixtures, run `pnpm test:browser` and open `http://127.0.0.1:17843/reader` or `/idb`. These use synthetic page content and simulated model responses with no external model calls. See the [testing guide](docs/validation.md) for coverage, recorded results and manual release checks.
 
 ```text
 src/background/   Requests, storage, settings, OpenRouter and Anki
