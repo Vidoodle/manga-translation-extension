@@ -1,6 +1,8 @@
 # Validation status
 
-Installed Firefox/BookWalker acceptance remains incomplete. After the focus-only changes, the user still saw a viewport jump and confirmed that closing other Firefox extension popups caused the same BookWalker behavior. Version 0.4.0 therefore moves Saved translations entirely into the reading page and removes Select area and history navigation from the extension popup. Reading uses the shortcut and in-page controls; the popup is configuration only.
+The maintainer has used this extension in Firefox on BookWalker throughout development and supplied hands-on feedback. This document records that feedback alongside automated and agent-run checks. Historical statements below that installed Firefox was “unverified” describe the coding agent's automation limitation, not an absence of real Firefox use.
+
+After the focus-only changes, the user still saw a viewport jump and confirmed that closing other Firefox extension popups caused the same BookWalker behavior. Version 0.4.0 therefore moves Saved translations entirely into the reading page and removes Select area and history navigation from the extension popup. Reading uses the shortcut and in-page controls; the popup is configuration only.
 
 Live paid OpenRouter requests through the production provider module were verified from Node on September 25, 2026. The [model screening report](model-benchmark-2026-09-25.md) covers 33 attempts on eight original Japanese crop fixtures: 31 accepted responses, one Gemini 3.8 vocabulary/transcript validation rejection, and one Qwen HTTP 429. All eight Gemini 3 Flash Preview requests succeeded with the current configuration. This does not reproduce the earlier Firefox HTTP 400 or establish installed Firefox/BookWalker compatibility.
 

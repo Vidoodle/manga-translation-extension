@@ -4,6 +4,9 @@ Versions follow `major.minor.patch`. Dates use ISO format. Versions 0.5.0–0.5.
 
 ## [Unreleased]
 
+- Add the MIT license, privacy policy, and a public-facing guide to installation, reading, Anki setup, and OpenRouter costs.
+- Record the pre-publication audit of Git history, release downloads, and CI artifacts and logs.
+
 ## [0.5.6] - 2026-09-26
 
 - Remove the retired page-recognition service, placement database stores, unused message routes, and redundant icons. Preserve saved translations and unresolved paid requests.

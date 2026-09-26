@@ -2,6 +2,7 @@
   "name": "manga-reading-assistant",
   "version": "0.5.6",
   "private": true,
+  "license": "MIT",
   "description": "A Firefox extension for studying Japanese manga in the reader.",
   "engines": {
     "node": ">=22"
