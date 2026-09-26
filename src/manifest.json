@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "Manga Reading Assistant",
+  "version": "0.4.6",
+  "description": "Read manga in Japanese with translations, word help, and grammar explanations alongside the page.",
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": ["https://openrouter.ai/*"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "manga-reading-lab@local.prototype",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["websiteContent", "browsingActivity", "authenticationInfo"]
+      }
+    }
+  },
+  "action": {
+    "default_title": "Manga Reading Assistant",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/toolbar-dark-16.png",
+      "32": "icons/toolbar-dark-32.png",
+      "64": "icons/toolbar-dark-64.png"
+    },
+    "theme_icons": [
+      { "light": "icons/toolbar-light-16.png", "dark": "icons/toolbar-dark-16.png", "size": 16 },
+      { "light": "icons/toolbar-light-32.png", "dark": "icons/toolbar-dark-32.png", "size": 32 },
+      { "light": "icons/toolbar-light-64.png", "dark": "icons/toolbar-dark-64.png", "size": 64 }
+    ]
+  },
+  "background": {
+    "scripts": [
+      "background/store.js",
+      "background/provider.js",
+      "background/settings.js",
+      "background/jobs.js",
+      "background/reader-session.js",
+      "background/pages.js",
+      "background/background.js"
+    ]
+  },
+  "commands": {
+    "select-manga": {
+      "suggested_key": {
+        "default": "Alt+Q"
+      },
+      "description": "Select manga text on this page"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https://openrouter.ai"
+  }
+}

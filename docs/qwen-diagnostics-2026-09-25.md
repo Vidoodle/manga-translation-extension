@@ -1,0 +1,25 @@
+# Qwen3.8 Flash diagnostics — 25 September 2026
+
+Qwen3.8 Flash produced useful translations on some crops, but repeatedly returned an array where the extension requires an object. Prompt and reasoning variations did not establish a reliable fix. A separate HTTP 429 response identified upstream shared-provider capacity as the limiting factor for that request. These are two distinct failure modes.
+
+This was a small, unblinded investigation using the eight original synthetic dialogue images in `benchmarks/casual-japanese/`. It was not a native-speaker evaluation or a representative manga benchmark. Records are preserved separately in the ignored `test-results/model-benchmark/qwen-diagnostic-20260925/` and `qwen-followup-20260925/` folders. They do not replace failures or change scores in the original multi-model benchmark. “Accepted” below means the production validator accepted the response, not that every explanation was correct.
+
+The production request used `qwen/qwen3.8-flash`, image input, strict `json_schema`, `provider.require_parameters: true`, `reasoning.max_tokens: 1024`, `max_tokens: 8192`, and streaming with usage reporting. The [OpenRouter model page](https://openrouter.ai/qwen/qwen3.8-flash) advertises images and structured output. Its [catalog](https://openrouter.ai/api/v1/models) advertises reasoning-budget support. [Alibaba's API documentation](https://www.alibabacloud.com/help/en/model-studio/qwen-api-via-openai-chat-completions) supports the corresponding thinking budget and streaming; budgets through 4096 map to low reasoning. Budget and effort must not both be supplied. Our request supplied only a budget.
+
+| Diagnostic variant | Outcome |
+| --- | --- |
+| Unchanged production, one attempt per crop | 4/8 accepted. Failures: 01, 04, 05, 08. |
+| Schema repeated in the prompt | 6/8 accepted. Samples 07 and 08 still returned `[]`. |
+| JSON-object mode plus inline schema | 07 accepted; 08 returned `[]`. |
+| Reasoning disabled | 08 accepted; 01 contained invented vocabulary and was rejected. |
+| Reasoning disabled plus inline schema | 01 and 02 received HTTP 429, with a pause between attempts. No accepted output validated this combination. |
+
+The production cohort combines the initial diagnostic attempt on 01 with seven follow-up attempts. An additional unchanged attempt on 03 succeeded, but is not included in that cohort. Invalid arrays included both `[]` and `[object]`; silently unwrapping an array would not repair the empty responses. The reasoning-disabled answer invented `なって`, which was absent from its own transcription. The substring validator correctly rejected it.
+
+All six accepted inline-schema answers had exact transcription under the benchmark's whitespace-normalized metric. They covered 17/25 reference reading targets across all eight attempted crops, counting rejected answers as zero. English meaning was preserved in the delivered answers, but teaching errors remained: labeling question particle `か` a copula, giving topic `は` its spelling instead of pronunciation `わ`, and describing benefactive `に` as a causative/passive marker. Output validity therefore cannot substitute for quality review.
+
+One sample-08 probe used OpenRouter's [upstream-body debugging](https://openrouter.ai/docs/api_reference/errors-and-debugging#debugging). The echo retained the image entry, instructions, strict object schema, and `max_completion_tokens: 8192`. It indicated that thinking settings were forwarded, but concealed their values. The response returned `[]` with normal `stop` reasons after 419 reasoning tokens and five visible tokens. This does not support budget exhaustion. The echo does not establish whether the invalid result originated in model generation, provider handling, or gateway response processing. OpenRouter also notes that [schema enforcement varies by provider](https://openrouter.ai/docs/guides/features/structured-outputs#best-practices).
+
+The latest 429 record named Alibaba and `limit_source: upstream_provider_shared_pool`. Its upstream message described temporary upstream throttling and offered waiting or supplying a provider key through [OpenRouter integrations](https://openrouter.ai/settings/integrations). A separate key check showed available credit and a non-free account; no balance is published here. That evidence identifies this recorded failure more precisely than a generic account-limit message, without explaining every earlier rejection. [OpenRouter's limits documentation](https://openrouter.ai/docs/api_reference/limits) distinguishes upstream throttling from platform limits.
+
+Across these two follow-up folders, 24 completed attempts comprise 13 accepted answers, nine invalid outputs, and two HTTP 429 responses. Twenty-two report charges totaling **$0.008624136**; two have unknown cost, not confirmed zero cost. No configuration fix was adopted from these trials. The supported request, strict validation, and deliberate retry safeguards remain; clearer capacity reporting is justified, but a reliability promise is not.

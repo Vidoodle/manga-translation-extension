@@ -1,4 +1,6 @@
-# Temporary work, local credentials and generated packages stay out of review.
+/node_modules/
+/.pnpm-store/
+/dist/
 /work/
 **/.env
 **/.env.*
@@ -6,6 +8,4 @@
 **/.local/
 **/__pycache__/
 *.pyc
-**/node_modules/
 **/test-results/
-/outputs/*.zip

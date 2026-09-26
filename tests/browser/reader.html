@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><title>Extension integration reader</title>
+  <style>
+    body {
+      margin: 0;
+      background: #e9ede7;
+      color: #203d2e;
+      font: 14px system-ui;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #e9ede7;
+      padding: 16px 24px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0;
+    }
+    button {
+      font: inherit;
+      padding: 8px 12px;
+      border: 1px solid #a8bfb1;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+    }
+    #manga,
+    .manga-panel {
+      display: block;
+      position: absolute;
+      left: 45px;
+      top: 100px;
+      width: 600px;
+      height: 520px;
+      background: white;
+    }
+    aside {
+      position: fixed;
+      left: 690px;
+      top: 105px;
+      width: 300px;
+      line-height: 1.6;
+    }
+    #status {
+      white-space: pre-wrap;
+    }
+    a {
+      color: #20654d;
+    }
+    body.continuous-scroll {
+      min-height: 3260px;
+    }
+    body.continuous-scroll #manga {
+      height: 3120px;
+    }
+    body.stacked-scroll #manga {
+      height: 520px;
+    }
+    body.continuous-scroll header {
+      position: fixed;
+      left: 690px;
+      top: 16px;
+      width: 300px;
+      padding: 0;
+    }
+    body.continuous-scroll aside {
+      top: 320px;
+    }
+    [hidden] {
+      display: none !important;
+    }
+  </style>
+  <header>
+    <h1>Extension integration fixture</h1>
+    <button id="activate">Simulate reading shortcut</button><button id="turn">Turn page</button
+    ><button id="first">Return to page 1</button
+    ><label id="auto-turn-label"
+      ><input id="auto-turn" type="checkbox" />Turn while translating</label
+    ><a href="/popup" target="_blank">Settings fixture</a>
+    <button id="open-popup">Open extension popup</button>
+    <span id="scroll-controls" hidden>
+      <button id="scroll-up">Scroll up 80 px</button>
+      <button id="scroll-down">Scroll down 80 px</button>
+      <button id="scroll-top">Return to top</button>
+      <label><input id="auto-scroll" type="checkbox" checked />Scroll while translating</label>
+    </span>
+  </header>
+  <canvas id="manga" width="1200" height="1040" aria-label="Synthetic Japanese manga page"></canvas>
+  <aside>
+    <strong>Real extension modules; simulated browser APIs and OpenRouter.</strong>
+    <p>No external requests or API credits. The fixture uses real canvas pixels and IndexedDB.</p>
+    <p id="status"></p>
+    <button id="clear-fixture">Reset fixture cache</button
+    ><button id="drop-key">Remove fixture key</button>
+  </aside>
+  <script src="/fixture-runtime.js"></script>
+  <script src="/src/background/store.js"></script>
+  <script src="/src/background/provider.js"></script>
+  <script src="/src/background/settings.js"></script>
+  <script src="/src/background/jobs.js"></script>
+  <script src="/src/background/reader-session.js"></script>
+  <script src="/src/background/pages.js"></script>
+  <script src="/src/background/background.js"></script>
+  <script src="/src/shared/models.js"></script>
+  <script src="/src/shared/japanese.js"></script>
+  <script src="/src/reader/vision.js"></script>
+  <script src="/src/reader/reader-view.js"></script>
+  <script src="/src/reader/page-tracker.js"></script>
+  <script src="/src/reader/content.js"></script>
+  <script>
+    document.getElementById("activate").onclick = () => fixture.activate();
+    document.getElementById("open-popup").onclick = () => fixture.api.action.openPopup();
+    document.getElementById("turn").onclick = () => fixture.turn(2);
+    document.getElementById("first").onclick = () => fixture.turn(1);
+    document.getElementById("scroll-up").onclick = () => window.scrollBy(0, -80);
+    document.getElementById("scroll-down").onclick = () => window.scrollBy(0, 80);
+    document.getElementById("scroll-top").onclick = () => window.scrollTo(0, 0);
+    document.getElementById("clear-fixture").onclick = () =>
+      fixture.popup("popup-clear-cache").then(fixture.showError);
+    document.getElementById("drop-key").onclick = () =>
+      fixture.popup("popup-remove-key").then(fixture.showError);
+    fixture.paint();
+    fixture.log();
+  </script>
+</html>

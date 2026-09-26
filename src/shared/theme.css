@@ -1,0 +1,24 @@
+:root,
+:host {
+  color-scheme: light dark;
+  --manga-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --manga-text: light-dark(#242b27, #ecede7);
+  --manga-muted: light-dark(#53675a, #acbaad);
+  --manga-accent: light-dark(#234d3c, #a3d2b6);
+  --manga-accent-hover: light-dark(#193c2e, #b9e4ca);
+  --manga-on-accent: light-dark(#ffffff, #17271f);
+  --manga-surface: light-dark(#fbfcf8, #202622);
+  --manga-surface-raised: light-dark(#ffffff, #2a322c);
+  --manga-border: light-dark(#bac7bd, #637568);
+  --manga-divider: light-dark(#d7dfd5, #3f4c43);
+  --manga-hover: light-dark(#e7eee4, #34463a);
+  --manga-error: light-dark(#8c2d1f, #ffb6a5);
+  --manga-error-bg: light-dark(#f7e8e2, #4b2c29);
+  --manga-focus: light-dark(#234d3c, #b9e4ca);
+  --manga-shadow: light-dark(#0c251b35, #00000066);
+  --manga-hint-bg: light-dark(#fbfcf8ad, #202622b8);
+  --manga-overlay: light-dark(#0d201926, #060b0826);
+  --manga-scrim: light-dark(#0d201961, #060b0861);
+  --manga-selection: light-dark(#16875f, #8cddae);
+  --manga-radius: 8px;
+}

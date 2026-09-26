@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Manga Reading Assistant</title>
+    <link rel="stylesheet" href="../shared/theme.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <img class="mark" src="../icons/icon-64.png" width="32" height="32" alt="" />
+      <div class="brand">
+        <h1>Manga Reading Assistant</h1>
+        <p>Japanese, in context.</p>
+      </div>
+    </header>
+    <section id="welcome-step" hidden>
+      <h2>Read Japanese, with a little help.</h2>
+      <p class="intro">
+        Select text in your manga to get a translation, then explore the Japanese when you need it.
+      </p>
+      <p class="hint">Connect your OpenRouter key and choose a model to get started.</p>
+      <button id="get-started" class="primary">Get started</button>
+    </section>
+    <section id="unavailable-step" hidden>
+      <h2>Settings are unavailable</h2>
+      <p class="hint">Reopen this popup to try again.</p>
+    </section>
+    <section id="settings-step" hidden>
+      <h2>Settings</h2>
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">Translation model</span>
+          <p id="current-model" class="hint"></p>
+        </div>
+        <button id="edit-model" class="icon-button" aria-label="Change model" title="Change model">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 7h14m-4-4 4 4-4 4M20 17H6m4-4-4 4 4 4" />
+          </svg>
+        </button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">OpenRouter key</span>
+          <p id="current-key" class="hint"></p>
+        </div>
+        <button id="edit-connection" class="text-button">Manage key</button>
+      </div>
+      <details id="shortcut-settings">
+        <summary>Shortcut: <kbd id="shortcut">Loading…</kbd></summary>
+        <label for="shortcut-input">Key combination</label>
+        <input
+          id="shortcut-input"
+          type="text"
+          placeholder="Alt+Q"
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="shortcut-help"
+        />
+        <p id="shortcut-help" class="hint">
+          For example, Alt+Q or Ctrl+Shift+U. Firefox checks supported combinations; conflicts with
+          other apps may still prevent activation.
+        </p>
+        <div class="actions">
+          <button id="save-shortcut">Set shortcut</button
+          ><button id="reset-shortcut" class="quiet">Reset</button
+          ><button id="disable-shortcut" class="quiet">Disable</button>
+        </div>
+      </details>
+      <details id="cache-settings">
+        <summary>Saved data</summary>
+        <p id="cache-stats" class="hint">Checking saved data…</p>
+        <button id="clear-cache" class="quiet">Clear saved data…</button>
+        <div id="clear-confirm" hidden>
+          <p class="hint">
+            Delete saved translations and page images? Unfinished requests, your key, and settings
+            will be kept.
+          </p>
+          <div class="actions">
+            <button id="confirm-clear" class="danger">Clear saved data</button
+            ><button id="cancel-clear">Keep saved data</button>
+          </div>
+        </div>
+      </details>
+      <div class="settings-reset">
+        <button id="restart-setup" class="text-button danger">Reset connection…</button>
+        <p class="hint">Remove your key and model choice to start setup again.</p>
+      </div>
+    </section>
+    <section id="restart-step" hidden>
+      <h2>Reset connection?</h2>
+      <p class="intro">
+        Remove your saved OpenRouter key and model choice, then return to the welcome screen.
+      </p>
+      <p class="hint">
+        Your saved translations, running requests, shortcut, and card position will be kept.
+      </p>
+      <div id="restart-confirm" class="step-actions" hidden>
+        <button id="cancel-restart" class="primary">Cancel</button>
+        <button id="confirm-restart" class="danger">Reset connection</button>
+      </div>
+    </section>
+    <section id="key-step" hidden>
+      <p id="key-step-label" class="eyebrow">STEP 1 OF 2</p>
+      <h2 id="key-heading">Connect OpenRouter</h2>
+      <p class="hint">
+        Translations include word help and grammar and are billed to your OpenRouter account.
+      </p>
+      <div id="connection">
+        <p id="key-state" class="hint"></p>
+        <p id="access-state" class="hint"></p>
+        <button id="allow-access" class="small" hidden>Allow OpenRouter access</button>
+        <label id="key-label" for="api-key">API key</label>
+        <p class="hint">
+          <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer"
+            >Create an OpenRouter key</a
+          >
+        </p>
+        <input
+          id="api-key"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Paste your OpenRouter key"
+        />
+        <div class="actions">
+          <button id="save-key" class="primary" disabled>Save and continue</button
+          ><button id="remove-key" class="quiet" hidden disabled>Remove key</button>
+        </div>
+        <p class="fine">
+          Firefox saves your key on this computer so you don’t have to enter it again. Only save it
+          on a computer you trust.
+        </p>
+        <details class="key-storage">
+          <summary>Keeping your key safe</summary>
+          <p class="fine">
+            Use your own password-protected computer account. Don’t save a key on a public computer
+            or a login shared with people you don’t trust.
+          </p>
+          <p class="fine">
+            Create a key just for this extension and set a low spending limit in
+            <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer"
+              >OpenRouter’s key settings</a
+            >. If you think it has been copied, delete it there and create a new one. Removing it
+            from this extension doesn’t disable a copied key.
+          </p>
+          <p class="fine">
+            The saved key isn’t encrypted. Someone who can read your Firefox files could copy it and
+            use your OpenRouter credits.
+          </p>
+        </details>
+      </div>
+      <div class="step-actions">
+        <button id="key-back" class="quiet">Back</button>
+      </div>
+    </section>
+    <section id="model-step" aria-labelledby="model-heading" hidden>
+      <p id="model-step-label" class="eyebrow">STEP 2 OF 2</p>
+      <h2 id="model-heading">Choose your translation model</h2>
+      <p id="recommendations-note" class="hint" hidden>
+        Suggested starting points; compare results on your manga.
+      </p>
+      <div id="recommended-models" class="model-choices" aria-label="Suggested models"></div>
+      <p id="recommended-empty" class="hint" hidden>
+        Suggested models aren’t available in this list. Browse all models below.
+      </p>
+      <div id="selected-model" class="selected-model" hidden>
+        <span class="setting-label">Selected model</span>
+        <p id="selected-model-name"></p>
+        <p id="model-price" class="hint"></p>
+      </div>
+      <details id="all-models">
+        <summary id="all-models-label">All models</summary>
+        <input
+          id="model-search"
+          type="search"
+          placeholder="Search models"
+          aria-label="Search all models"
+          autocomplete="off"
+        />
+        <div
+          id="model-list"
+          class="model-choices model-list"
+          aria-label="All available models"
+        ></div>
+        <p id="model-list-empty" class="hint" hidden>No models match your search.</p>
+      </details>
+      <p id="model-pricing-help" class="fine" hidden>
+        Rates are per million tokens. Input includes your images and text; output includes the
+        answer and any model thinking. The cost of each selection varies.
+      </p>
+      <div class="model-refresh">
+        <p id="catalog-status" class="hint" role="status"></p>
+        <button id="refresh-models" class="text-button" hidden>Retry model list</button>
+      </div>
+      <div class="step-actions">
+        <button id="model-back" class="quiet">Back</button
+        ><button id="finish-setup" class="primary" disabled>Finish setup</button>
+      </div>
+    </section>
+    <p id="setup-warning" class="hint"></p>
+    <p id="status" role="status" aria-live="polite"></p>
+    <script src="../shared/models.js"></script>
+    <script src="popup-format.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

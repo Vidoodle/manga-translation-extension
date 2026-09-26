@@ -1,0 +1,85 @@
+[
+  {
+    "id": "01-contractions",
+    "japanese": "もう帰らなきゃ。\n待って、まだ話終わってないって！",
+    "image": "images/01-contractions.png",
+    "layout": "vertical",
+    "reference": "I've got to go home. / Wait, we're not done talking! Preserve obligation and the unfinished conversation.",
+    "words": {
+      "帰らなきゃ": ["かえらなきゃ"],
+      "待って": ["まって"],
+      "終わってない": ["おわってない"]
+    },
+    "grammar": "なきゃ contracts なければならない; 終わってない contracts 終わっていない; final って reinforces the protest."
+  },
+  {
+    "id": "02-reported-speech",
+    "japanese": "さっき電話した？\nうん。明日は来られないって。",
+    "image": "images/02-reported-speech.png",
+    "layout": "horizontal",
+    "reference": "Did you call earlier? / Yeah. They said they can't come tomorrow. Preserve reported speech and avoid inventing the absent person's identity; accept other readings genuinely supported by the omitted subjects.",
+    "words": { "電話": ["でんわ"], "明日": ["あした", "あす"], "来られない": ["こられない"] },
+    "grammar": "って reports speech; 来られない is negative potential in context; Japanese omits the participants."
+  },
+  {
+    "id": "03-lending-favor",
+    "japanese": "この傘、姉が貸してくれたんだ。\nじゃ、帰ったらちゃんと返しなよ。",
+    "image": "images/03-lending-favor.png",
+    "layout": "vertical",
+    "ruby": { "傘": "かさ" },
+    "reference": "My older sister lent me this umbrella. / Then make sure you return it when you get home. The sister lends and speaker receives; 返しなよ is an instruction to return, not a prohibition.",
+    "words": { "傘": ["かさ"], "姉": ["あね"], "返しなよ": ["かえしなよ"] },
+    "grammar": "てくれる conveys receiving someone's helpful action; たら means when/once here; 返しなよ urges returning it."
+  },
+  {
+    "id": "04-receiving-explanation",
+    "japanese": "先生にもう一度説明してもらった。\nで、やっとわかった？",
+    "image": "images/04-receiving-explanation.png",
+    "layout": "vertical",
+    "font_size": 24,
+    "reference": "I had the teacher explain it to me again. / So, did you finally understand? The teacher explains and the speaker receives that explanation; the action already happened.",
+    "words": { "先生": ["せんせい"], "もう一度": ["もういちど"], "説明": ["せつめい"] },
+    "grammar": "てもらう expresses receiving another person's action; に identifies its performer; もらった is past."
+  },
+  {
+    "id": "05-negation-scope",
+    "japanese": "嫌いなわけじゃない。\nただ、毎日は食べたくないだけ。",
+    "image": "images/05-negation-scope.png",
+    "layout": "horizontal",
+    "reference": "It's not that I dislike it. I just don't want to eat it every day. Do not change this to hatred or an affirmative claim of loving it.",
+    "words": { "嫌い": ["きらい"], "毎日": ["まいにち"], "食べたくない": ["たべたくない"] },
+    "grammar": "わけじゃない rejects an interpretation; たくない negates desire; 毎日は and だけ limit the objection to daily consumption."
+  },
+  {
+    "id": "06-kansai",
+    "japanese": "それ、ほんまに買うん？\n高すぎやろ。うち、そんなん買えへんわ。",
+    "image": "images/06-kansai.png",
+    "layout": "vertical",
+    "reference": "You're really buying that? / That's way too expensive. I can't afford something like that. Preserve the speaker's price objection and contextually likely inability; natural English need not imitate an English regional dialect.",
+    "words": { "ほんま": ["ほんま"], "高すぎ": ["たかすぎ"], "買えへん": ["かえへん"] },
+    "grammar": "すぎ expresses excess; やろ is dialectal だろう/でしょう; 買えへん is the dialectal negative potential in this context."
+  },
+  {
+    "id": "07-unfinished-condition",
+    "japanese": "ありがとう、助かった。\nもし、あのとき君が来てなかったら……",
+    "image": "images/07-unfinished-condition.png",
+    "layout": "vertical",
+    "reference": "Thanks—you really helped me. / If you hadn't come then… Leave the consequence unfinished; 'you saved me' is also acceptable. Do not invent what would have happened.",
+    "words": { "助かった": ["たすかった"], "君": ["きみ"], "来てなかったら": ["きてなかったら"] },
+    "grammar": "来てなかったら contracts 来ていなかったら; もし…たら introduces the counterfactual condition whose consequence is omitted."
+  },
+  {
+    "id": "08-contextual-reading",
+    "japanese": "刺身、明日まで置いとける？\n生物だし、今日中に食べちゃおう。",
+    "image": "images/08-contextual-reading.png",
+    "layout": "vertical",
+    "reference": "Can we keep the sashimi until tomorrow? / It's raw/perishable food, so let's eat it today. 生物 is なまもの here, not biology or living organisms.",
+    "words": {
+      "刺身": ["さしみ"],
+      "生物": ["なまもの"],
+      "明日": ["あした", "あす"],
+      "今日中": ["きょうじゅう"]
+    },
+    "grammar": "置いとける contracts 置いておける (ability to keep it); し gives a reason; 食べちゃおう contracts 食べてしまおう, proposing finishing it."
+  }
+]

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><title>Extension native IndexedDB checks</title>
+  <style>
+    body {
+      font: 16px system-ui;
+      max-width: 850px;
+      margin: 40px auto;
+      background: #f7faf7;
+      color: #203d2e;
+    }
+    li {
+      padding: 8px;
+    }
+    pre {
+      white-space: pre-wrap;
+    }
+  </style>
+  <h1>Native IndexedDB checks</h1>
+  <p>Real browser storage; isolated synthetic records. No model requests.</p>
+  <ol id="results"></ol>
+  <pre id="summary">Running…</pre>
+  <script src="/src/background/store.js"></script>
+  <script>
+    (async () => {
+      const results = [],
+        dbName = "manga-fixture-" + crypto.randomUUID();
+      let store = await new MangaStorage.MangaStore(indexedDB, dbName).open();
+      const assert = (condition, message) => {
+        if (!condition) throw new Error(message);
+      };
+      const candidate = (id, key, extra = {}) => ({
+        id,
+        key,
+        kind: "translation",
+        status: "running",
+        model: "fixture/model",
+        input: { imageDataUrl: "fixture-image", context: "" },
+        createdAt: Date.now(),
+        accessedAt: Date.now(),
+        associations: [],
+        ...extra,
+      });
+      async function test(name, run) {
+        try {
+          await run();
+          results.push({ name, passed: true });
+        } catch (error) {
+          results.push({ name, passed: false, error: error.message });
+        }
+        const item = document.createElement("li");
+        const result = results.at(-1);
+        item.textContent =
+          (result.passed ? "PASS: " : "FAIL: ") + name + (result.error ? " — " + result.error : "");
+        document.getElementById("results").append(item);
+      }
+      await test("Concurrent identical submissions claim exactly one durable job", async () => {
+        const claims = await Promise.all(
+          Array.from({ length: 12 }, (_, i) =>
+            store.claim(candidate("duplicate-" + i, "same-key")),
+          ),
+        );
+        assert(claims.filter((c) => c.created).length === 1, "More than one request claim");
+        assert(new Set(claims.map((c) => c.job.id)).size === 1, "Callers did not join one job");
+        window.firstJob = claims[0].job.id;
+      });
+      await test("Completed answers and model provenance survive reopening", async () => {
+        await store.finish(firstJob, {
+          status: "completed",
+          result: {
+            run_id: "saved-run",
+            model: "fixture/model",
+            usage: { cost_usd: 0.01 },
+            analysis: { regions: [{ japanese: "もう帰らなきゃ。" }] },
+          },
+        });
+        store.db.close();
+        store = await new MangaStorage.MangaStore(indexedDB, dbName).open();
+        const claim = await store.claim(candidate("must-not-submit", "same-key"));
+        assert(!claim.created && claim.job.status === "completed", "Saved answer not reused");
+        assert(
+          (await store.run("saved-run")).result.model === "fixture/model",
+          "Model provenance lost",
+        );
+      });
+      await test("Unresolved submissions become interrupted after restart without resending", async () => {
+        await store.claim(candidate("lost-request", "lost-key"));
+        store.db.close();
+        store = await new MangaStorage.MangaStore(indexedDB, dbName).open();
+        const claim = await store.claim(candidate("accidental-repeat", "lost-key"));
+        assert(
+          !claim.created && claim.job.status === "interrupted",
+          "Unknown outcome was resubmitted",
+        );
+      });
+      await test("Concurrent deliberate retries still create only one replacement request", async () => {
+        const claims = await Promise.all([
+          store.claim(candidate("retry-one", "lost-key"), "lost-request"),
+          store.claim(candidate("retry-two", "lost-key"), "lost-request"),
+        ]);
+        assert(claims.filter((c) => c.created).length === 1, "Retry was duplicated");
+        assert(claims[0].job.id === claims[1].job.id, "Retries did not join");
+      });
+      await test("Different model and context keys do not reuse the original answer", async () => {
+        assert(
+          (
+            await store.claim(
+              candidate("other-model", "different-model", { model: "fixture/other" }),
+            )
+          ).created,
+          "New model reused old answer",
+        );
+        assert(
+          (
+            await store.claim(
+              candidate("other-context", "different-context", {
+                input: { imageDataUrl: "fixture-image", context: "new context" },
+              }),
+            )
+          ).created,
+          "New context reused old answer",
+        );
+      });
+      await test("Clear cache preserves unresolved requests and their source page", async () => {
+        await store.savePage({
+          id: "pending-page",
+          scope: "fixture",
+          imageDataUrl: "page-image",
+          updatedAt: Date.now(),
+        });
+        await store.claim(
+          candidate("with-page", "page-key", {
+            associations: [
+              { id: "region-1", pageId: "pending-page", rect: { x: 1, y: 2, width: 3, height: 4 } },
+            ],
+          }),
+        );
+        await store.prune(true);
+        assert((await store.get("jobs", "with-page")).status === "running", "Live request removed");
+        assert((await store.page("pending-page")).page, "Source page removed");
+        assert(!(await store.run("saved-run")), "Completed answer not cleared");
+      });
+      const passed = results.filter((r) => r.passed).length;
+      document.getElementById("summary").textContent = `${passed}/${results.length} checks passed`;
+      await fetch("/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suite: "native-indexeddb", results }),
+      });
+      store.db.close();
+      indexedDB.deleteDatabase(dbName);
+    })().catch((error) => {
+      document.getElementById("summary").textContent = "FAILED: " + error.stack;
+    });
+  </script>
+</html>

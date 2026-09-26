@@ -1,0 +1,50 @@
+.jp-word {
+  display: inline;
+  border: 0;
+  border-bottom: 1px dotted var(--manga-accent);
+  border-radius: 2px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: help;
+}
+.jp-word:hover,
+.jp-word:focus-visible {
+  background: var(--manga-hover);
+  color: var(--manga-accent);
+}
+.jp-gloss {
+  position: fixed;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  pointer-events: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px 16px;
+  border: 1px solid var(--manga-border);
+  border-radius: var(--manga-radius);
+  background: var(--manga-surface-raised);
+  color: var(--manga-text);
+  box-shadow: 0 6px 24px var(--manga-shadow);
+  color-scheme: light dark;
+  font: 400 13px/1.5 var(--manga-font);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.jp-surface {
+  font-size: 16px;
+  font-weight: 600;
+}
+.jp-reading {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--manga-muted);
+  margin-top: 4px;
+}
+.jp-gloss .jp-meaning {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
