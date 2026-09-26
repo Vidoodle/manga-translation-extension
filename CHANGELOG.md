@@ -4,6 +4,8 @@ Versions follow `major.minor.patch`. Dates use ISO format. Versions 0.5.0–0.5.
 
 ## [Unreleased]
 
+- Add a visual product walkthrough, Firefox publication and setup guidance, and a separate developer guide.
+
 - Add the MIT license, privacy policy, and a public-facing guide to installation, reading, Anki setup, and OpenRouter costs.
 - Record the pre-publication audit of Git history, release downloads, and CI artifacts and logs.
 - Replace development-session notes with a focused testing guide and current product documentation.
