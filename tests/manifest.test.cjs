@@ -55,14 +55,52 @@ test("Firefox package resolves all its declared entry points", () => {
   assert.ok(fs.existsSync(popupIconFile), `Missing packaged popup icon: ${popupIcon}`);
 });
 
-test("installed extension has only explicit page access and OpenRouter host access", () => {
+test("every packaged file is reachable from declared entry points or local resource references", () => {
+  const all = fs
+    .readdirSync(source, { recursive: true })
+    .filter((file) => fs.statSync(path.join(source, file)).isFile());
+  const visited = new Set(),
+    queue = ["manifest.json"];
+  while (queue.length) {
+    const file = queue.shift();
+    if (visited.has(file)) continue;
+    visited.add(file);
+    if (!/\.(js|css|html|json)$/.test(file)) continue;
+    const content = fs.readFileSync(path.join(source, file), "utf8");
+    for (const [, reference] of content.matchAll(
+      /["']([^"'\r\n]+\.(?:js|css|html|png|json))["']/g,
+    )) {
+      for (const candidate of [
+        path.resolve(source, path.dirname(file), reference),
+        path.resolve(source, reference),
+      ]) {
+        if (
+          candidate.startsWith(source + path.sep) &&
+          fs.existsSync(candidate) &&
+          fs.statSync(candidate).isFile()
+        ) {
+          queue.push(path.relative(source, candidate));
+          break;
+        }
+      }
+    }
+  }
+  assert.deepEqual(
+    all.filter((file) => !visited.has(file)),
+    [],
+    "Remove unused packaged files or reference them explicitly",
+  );
+});
+
+test("installed extension has explicit page access, OpenRouter and optional local Anki access", () => {
   assert.deepEqual(manifest.permissions, ["activeTab", "storage", "scripting"]);
   assert.deepEqual(manifest.host_permissions, ["https://openrouter.ai/*"]);
+  assert.deepEqual(manifest.optional_host_permissions, ["http://127.0.0.1/*"]);
   assert.equal(manifest.content_scripts, undefined);
   assert.equal(manifest.externally_connectable, undefined);
   assert.match(
     manifest.content_security_policy.extension_pages,
-    /connect-src 'self' https:\/\/openrouter\.ai$/,
+    /connect-src 'self' https:\/\/openrouter\.ai http:\/\/127\.0\.0\.1:8765$/,
   );
   assert.equal(manifest.commands["select-manga"].suggested_key.default, "Alt+Q");
 });

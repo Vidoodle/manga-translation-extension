@@ -1,47 +1,53 @@
-# Proposed Anki word mining
+# Anki word mining
 
-Discussion draft, 26 September 2026. **Not implemented.** This proposal reuses saved translations; mining a word would not make another model request.
+Implemented in version 0.5.0, with optional onboarding in 0.5.1. Mining reuses your translation without another model request.
 
-## Reading flow
+## Setup
 
-After configuration, the existing word popup would have a small **Add to Anki** icon. One click would add that word using the saved mapping and show success in place. An optional **Edit** action would let the user adjust the word, meaning, or context before adding. Hovering would never create a note, and adding would not move the reading page or open another application window.
+1. Install [AnkiConnect from AnkiWeb](https://ankiweb.net/shared/info/2055492159) in Anki Desktop, restart Anki, and open your collection.
+2. During first setup, Anki is the optional step after choosing a model. Choose **Connect to Anki** or **Skip for now**; it remains available under **Settings → Anki → Configure**. Connecting requests local access in Firefox; accept Anki’s connection prompt if it appears.
+3. Choose your existing deck and regular note type, then assign each value to a field. Several values can share a field in the displayed order.
+4. Save, close settings, and activate the reader with your shortcut. Unfinished onboarding resumes on reopening; saving or skipping completes it. Existing users keep their settings without repeating setup.
 
-The extension would create one Anki *note* per selected word. The selected note type determines how many cards that note produces. Audio, automatic dictionary lookup, deck creation, and an offline submission queue would be outside the first version.
+For Basic notes, the default is **Word → Front** and **Reading, Meaning, Japanese context, Full translation → Back**. Specialized vocabulary note types can keep values separate. Unmapped fields stay empty except for the derived Kaishi fields described below. Your existing card templates determine what appears when studying. Deck/template creation and cloze generation are not included.
 
-## Configuration
+### Kaishi cards (0.5.5)
 
-Add an Anki section to Settings: connect to local Anki, choose an existing deck, choose an existing note type, and map its fields. Show a sample preview while configuring, rather than requiring a preview for every word. Remember the mapping and offer a refresh when the user changes their Anki collection.
+Kaishi's field schema is recognized automatically, including cloned note types. Setup suggests Word → Word, Reading → Word Reading, Meaning → Word Meaning, Japanese context → Sentence, and Full translation → Sentence Meaning. Existing mappings with Reading → Word Furigana also work without reconfiguration.
 
-| Available value | Meaning |
+With these mappings, Add to Anki also fills Word Reading, Word Furigana and Sentence Furigana. The word keeps its kanji with the reading above it; Japanese context appears on both sides. The mined word is highlighted using Kaishi's existing bold color and its available reading is included in the sentence. Other words remain plain Japanese; no extra model request is made. Edited values are used, and missing readings leave the Japanese visible.
+
+New notes include a 20px gap above the front sentence and comfortable sentence line height. Single manga line breaks are joined for reading, while paragraph breaks remain. This formatting is stored in the new note's sentence fields. Shared templates, existing notes and saved translations are not modified. Custom mappings outside the standard Kaishi layout retain the generic field behavior.
+
+| Value | Saved content |
 | --- | --- |
-| Word | The selected Japanese surface exactly as displayed, including inflection |
-| Reading | The reading already supplied for that surface |
-| Meaning | The existing contextual English word explanation |
-| Japanese context | The captured Japanese passage, optionally edited down to a sentence |
-| Full translation | The English translation of the entire captured passage |
+| Word | The displayed Japanese surface, including inflection |
+| Reading | The reading from this translation |
+| Meaning | Its contextual English explanation |
+| Japanese context | The full captured Japanese passage |
+| Full translation | The full captured English translation |
 
-Fields could be omitted or combined, so an ordinary Front/Back note type remains usable. More specialized note types could keep these values separate. The first release should support ordinary vocabulary note types; cloze generation would require a separate design.
+Word is not automatically converted to dictionary form. Readings and meanings are model output and can be corrected.
 
-**Word does not mean dictionary form.** The current data has no lemma, so, for example, an inflected surface must not silently be replaced with a guessed base form. Reading and meaning are model output and should remain editable.
+## Mining
 
-## Context is the main product decision
+Hover to preview a Japanese word; click it to pin its popup while you move to the controls. Other words do not take over on hover. Click another word to switch, or click outside / press Esc to dismiss. Scrolling the reading area also dismisses word help. Click **+ (Add to Anki)** to create a note, or the **pencil (Edit Anki note)** to adjust values first. The editor has one action, **Add to Anki**, below the fields. It sends the edited note directly; no separate Done or Save step is needed. Successful submission closes the editor. Success appears in the same popup. Fresh and saved translations use the same flow. Hovering never creates a note.
 
-The current provider returns one Japanese transcription and one English translation for the whole crop, with `words: [{surface, reading, meaning}]`. Internally these become one selection region. `WordHelp` matches exact surfaces in the transcript; it does not carry sentence IDs or English alignments. Repeated appearances of the same surface currently use the same matching vocabulary entry.
+Each add creates one note tagged `manga-reading-assistant`; the note type determines how many cards it produces. A crop can contain multiple sentences. You can trim Japanese context in the editor, but the English stays labelled **Full translation** and is not automatically aligned to a trimmed sentence. Audio, dictionary lookup, automatic sentence alignment, cloze generation and TSV export are not included.
 
-The dependable default is therefore **full captured Japanese + full translation**. An optional editor can let the user trim Japanese context to the source sentence. That does not make the full English translation a translation of only that sentence. We should keep the label “Full translation,” and avoid inventing sentence alignment or making another paid request. Automatic sentence suggestions could come later, but punctuation and manga line breaks are not reliable sentence boundaries.
+## Connection and recovery
 
-## Local connection and duplicate handling
+Keep Anki Desktop running with your collection open. Only the extension background contacts `http://127.0.0.1:8765`. Keep AnkiConnect’s default loopback binding; wildcard origins and network-wide access are unnecessary. Firefox’s optional permission covers the loopback host; the extension code and connection policy restrict Anki requests to port 8765.
 
-Anki desktop would need to be running with AnkiConnect installed and a collection open. Its archived official configuration uses API version 6 at `http://127.0.0.1:8765`, with an optional API key. The extension should keep requests in its background context and request only the required localhost access; its present host permissions and connection policy do not permit this endpoint. Keep AnkiConnect bound to loopback and avoid wildcard CORS configuration. [Official configuration](https://github.com/FooSoft/anki-connect/blob/master/plugin/util.py) · [Mozilla host permissions](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/host_permissions).
+If you configured an AnkiConnect API key, enter it under the optional key disclosure. It is saved locally alongside the mapping, never synced, sent to OpenRouter or exposed to the reading page. Blank keeps a saved key. **Disconnect** removes Anki settings and the key and revokes local access, without deleting notes in Anki. Resetting OpenRouter setup preserves Anki settings.
 
-The relevant API actions are `requestPermission`, `deckNames`, `modelNames`, `modelFieldNames`, `canAddNotes`, and `addNote`. The latter returns a note ID; preflight success does not replace checking the add result. Duplicate checking uses the first field and, by default, the same note type across the collection. `duplicateScope: "deck"` and child-deck options narrow or expand that scope; `allowDuplicate` permits a deliberate override. Recommend rejecting duplicates by default, with no automatic updates to existing notes. Putting Word first means different inflections remain different entries. [Official API implementation](https://github.com/FooSoft/anki-connect/blob/master/plugin/__init__.py).
+- **Anki closed:** open Anki and try Add again. Your editor remains available.
+- **Duplicate:** no second note is added. Anki compares the first field within the same note type across the collection. Include Word in that field. Different inflections can count as different words. Existing notes are never overwritten.
+- **Fields changed:** reconnect and save a new mapping.
+- **No confirmation:** the note may already exist. Check Anki before retrying. Add stays disabled for that word in the current reader session; close and reactivate the reader after checking if another attempt is needed. There are no automatic retries or offline queue.
 
-If Anki is closed, keep the word popup available and show “Open Anki and try again.” If an add times out, report that its outcome is unknown and let the user check Anki before retrying. Disable repeated clicks while an add is pending. No automatic resubmission or queue is needed.
+## Verification
 
-AnkiConnect also checks request origins and supports a permission handshake; the archived server has special handling for extension origins. Actual Firefox behavior and the installed add-on must be verified before implementation. [Official origin handling](https://github.com/FooSoft/anki-connect/blob/master/plugin/web.py).
+The v6 contract and handshake were checked against the [official API source](https://github.com/FooSoft/anki-connect/blob/master/plugin/__init__.py) and [origin handling](https://github.com/FooSoft/anki-connect/blob/master/plugin/web.py). That archived repository points to [SourceHut](https://git.sr.ht/~foosoft/anki-connect), which could not be retrieved here.
 
-## Optional fallback and verification limit
-
-A UTF-8 TSV export could support manual import without AnkiConnect. Anki lets users choose the deck/note type and map columns. Import duplicate behavior needs care: the default can update matching first fields, so it is not equivalent to the proposed reject-duplicate Add action. Media would need separate packaging. [Official text-import manual](https://docs.ankiweb.net/importing/text-files.html).
-
-FooSoft's GitHub repository is archived and explicitly points to [SourceHut as the current upstream](https://git.sr.ht/~foosoft/anki-connect). SourceHut could not be retrieved during this review. The API details above were checked against the archived official source, not a verified current checkout; confirm them against the installed/current version before implementing. [Official migration notice](https://github.com/FooSoft/anki-connect).
+Automated checks cover mapping, escaping, full context, duplicates, concurrent clicks, permissions, offline and unknown outcomes, and reader ownership. Browser fixtures cover configuration, editing and add feedback with simulated Anki responses. Version 0.5.5 was also checked through live AnkiConnect: the production add service created one temporary note using the user's Kaishi type and existing field mapping; Anki's rendered card HTML confirmed ruby readings, Japanese context on both sides and spacing. The temporary note was removed and removal confirmed. Existing notes and templates were not edited. Installed Firefox/BookWalker testing remains outstanding because of the computer-use tool’s Firefox URL-policy limitation.

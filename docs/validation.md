@@ -82,3 +82,38 @@ Opening the supplied BookWalker viewer in the supported in-app browser instead p
 - Have a competent Japanese reader assess transcription, meaning, natural English, word help and grammar on representative manga.
 
 Unknown outcomes never authorize automatic paid retries. A deliberate retry can incur another charge. The package remains unsigned; temporary installation disappears on Firefox restart.
+
+## Anki mining — 26 September 2026 (0.5.0)
+
+- 281 automated tests pass, including mapping, escaping, multi-region context, duplicate/concurrent submission, permissions, offline/unknown outcomes, save/disconnect ordering, reader authentication and optional setup.
+- The in-app browser exercised real settings and reader UI against synthetic Anki responses: configure Basic fields, save settings, translate, open word help, edit its meaning and add successfully. Translation request count stayed unchanged during mining.
+- Tests found and resolved a pending-popup reopen bug: the reopened popup now receives completion feedback.
+- No real collection was modified. The local AnkiConnect probe did not connect. Native Firefox inspection was first rejected because its current page contained unrelated private content; opening a separate test tab then hit unsupported Firefox URL-policy enforcement. Installed Firefox/BookWalker and live AnkiConnect remain unverified.
+
+## Optional Anki onboarding — 0.5.1
+
+285 automated tests pass. Coverage includes fresh setup, persisted resume, skipping without Anki access, saving a mapping, back navigation, skipping after connection failure, existing-user behavior and reset persistence. The in-app browser fixture verified the optional step layout, Skip for now and reopening to Settings after completion. This does not extend the installed Firefox/Anki verification described above.
+
+## Pinned word help — 0.5.2
+
+287 automated tests pass. New regressions cover pinning an already hovered word without recreating its popup; crossing another word, focus changes and delayed leave events; explicit word switching and dismissal; and keeping the correct word and edited meaning when adding to Anki. No new live Firefox verification is claimed.
+
+## Word editor controls — 0.5.3
+
+287 automated tests pass. The word editor now shows a text Done action while open, updates the popup preview with edited values, and keeps Add to Anki separate. Tests cover the action labels, editor state, preview update and lack of submission on Done. The supported browser fixture verified opening the editor, changing a meaning and returning to the revised popup via Done.
+
+## Direct edit-and-add — 0.5.4
+
+The editor now has one Add to Anki action below its fields. It submits current edits directly and collapses after confirmed success. The pencil is hidden during editing; there is no Done step. All 287 tests pass, covering edited payloads, pending guards, retained drafts and success state. The supported browser fixture exercised editing a meaning and submitting directly through simulated AnkiConnect.
+
+## Kaishi note formatting — 0.5.5
+
+All 291 tests pass. Added coverage for both saved and suggested Kaishi mappings, generated furigana, edited readings/context, preserved paragraphs, sentence spacing, escaping, unavailable readings and custom mappings. Through live AnkiConnect, the production AnkiService.add created a temporary note in Mined Words using the real Kaishi 1.5k note type. cardsInfo confirmed actual Anki ruby rendering, the Japanese sentence on both card sides and the front sentence gap. The test note was then deleted by its returned ID and removal confirmed. Existing notes and shared card templates were not changed. The live rendered HTML is in ignored test-results/kaishi-live-render.json. This verifies the Anki boundary, not installed Firefox/BookWalker interaction.
+
+## Repository cleanup and releases — 0.5.6
+
+- 286 automated tests pass. The count is lower because tests for removed page-placement routes and fresh standalone study creation were removed; current translation, capture, retry, Anki and migration coverage remains. New checks cover v2-to-v3 preservation, retired message rejection, packaged-file reachability and version/changelog consistency.
+- Native IndexedDB fixture: 6/6 checks passed in the in-app browser. The reader fixture loaded the renamed capture module, translated a selection with exactly one capture and one simulated request, and reopened the saved answer with no extra capture or request. Its existing saved entries survived the storage upgrade.
+- Formatting and git whitespace checks pass. A local unused-variable audit reported no unused local variables in production JavaScript.
+- Mozilla web-ext 10.7.0: zero errors, one warning for Android's data-collection manifest support (142 versus the desktop minimum 140). Desktop Firefox is the target; Android and installed Firefox/BookWalker interaction remain unverified.
+- The versioned ZIP contains only extension source; its SHA-256 checksum accompanies it. Local packaging is not Mozilla signing or publication.

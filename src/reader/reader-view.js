@@ -45,6 +45,7 @@
         doc: this.reader.doc,
         portal: this.shadow,
         viewport: () => this.reader.viewport,
+        mine: (context, edits) => this.reader.send("anki-add", { ...context, edits }),
       });
     }
 
@@ -63,7 +64,7 @@
         "body",
         "instruction",
         "progress",
-        "studyRoot",
+        "grammarRoot",
         "setupNotice",
         "changeModelButton",
         "placementNotice",
@@ -76,7 +77,7 @@
       this.removeCard();
       this.shield?.remove();
       this.selection?.remove();
-      this.card = this.body = this.progress = this.studyRoot = null;
+      this.card = this.body = this.progress = this.grammarRoot = null;
       this.shield = this.node("div", "shield");
       this.instruction = this.node(
         "div",
@@ -558,8 +559,21 @@
         );
       } else {
         this.body.append(this.node("p", "eyebrow", "Japanese"));
-        for (const region of regions)
-          this.body.append(this.wordHelp.render(region.japanese, region.words));
+        for (const [regionIndex, region] of regions.entries())
+          this.body.append(
+            this.wordHelp.render(
+              region.japanese,
+              region.words,
+              this.reader.ankiEnabled
+                ? {
+                    runId: this.reader.selection.run.run_id,
+                    regionIndex,
+                    japanese: regions.map((item) => item.japanese).join("\n\n"),
+                    translation: regions.map((item) => item.translation).join("\n\n"),
+                  }
+                : null,
+            ),
+          );
         const translation = this.node("div", "section");
         translation.append(
           this.node("p", "eyebrow", "Translation"),
@@ -570,9 +584,9 @@
           ),
         );
         this.body.append(translation);
-        this.studyRoot = this.node("div", "study");
-        this.body.append(this.studyRoot);
-        this.renderStudy();
+        this.grammarRoot = this.node("div", "study");
+        this.body.append(this.grammarRoot);
+        this.renderGrammar();
       }
       this.renderModelInfo();
       this.positionDraggedCard();
@@ -660,16 +674,16 @@
       }
     }
 
-    renderStudy() {
-      if (!this.studyRoot || !this.reader.selection.run) return;
+    renderGrammar() {
+      if (!this.grammarRoot || !this.reader.selection.run) return;
       const grammar = this.reader.selection.run.analysis.regions.flatMap(
         (region) => region.grammar,
       );
-      this.studyRoot.replaceChildren();
-      this.studyRoot.hidden = !grammar.length;
-      if (grammar.length) this.studyRoot.append(this.node("p", "eyebrow", "Grammar"));
+      this.grammarRoot.replaceChildren();
+      this.grammarRoot.hidden = !grammar.length;
+      if (grammar.length) this.grammarRoot.append(this.node("p", "eyebrow", "Grammar"));
       for (const item of grammar)
-        this.studyRoot.append(
+        this.grammarRoot.append(
           this.node("h3", "section", item.pattern),
           this.node("p", "", item.explanation),
         );

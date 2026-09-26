@@ -5,19 +5,19 @@
     typeof module !== "undefined" && module.exports
       ? require("./vision.js")
       : globalThis.MangaVision;
-  const { normalizeRect, pixelCrop, placeCard } = vision;
+  const { normalizeRect } = vision;
   const ReaderView =
     typeof module !== "undefined" && module.exports
       ? require("./reader-view.js")
       : globalThis.ReaderView;
-  const PageTracker =
+  const SelectionCapture =
     typeof module !== "undefined" && module.exports
-      ? require("./page-tracker.js")
-      : globalThis.PageTracker;
+      ? require("./selection-capture.js")
+      : globalThis.SelectionCapture;
   class SelectionOverlay {
     constructor(win, runtime) {
       this.ui = new ReaderView(this);
-      this.tracker = new PageTracker(this);
+      this.tracker = new SelectionCapture(this);
       this.win = win;
       this.doc = win.document;
       this.runtime = runtime;
@@ -58,6 +58,7 @@
       this.cardPosition = message.cardPosition || this.cardPosition || { x: 1, y: 1 };
       this.model = message.model || "";
       this.shortcut = message.shortcut || "";
+      this.ankiEnabled = !!message.ankiEnabled;
       this.setupRequired = !!message.setupRequired;
       this.setupWarning =
         message.setupWarning ||
@@ -592,7 +593,7 @@
         this.ui.renderTranslation();
         if (["queued", "running"].includes(history.studyJob?.status)) {
           const region = this.selection.run.analysis.regions[this.selection.regionIndex];
-          if (region) void this.requestStudy(region.id);
+          if (region) void this.resumeStudy(region.id);
         }
       } else if (history.job) {
         this.selection.translationJob = history.job.job_id || history.job.id || history.job.jobId;
@@ -737,16 +738,14 @@
       }
     }
 
-    async requestStudy(regionId, retry = false) {
+    async resumeStudy(regionId) {
       if (!this.selection.run) return;
       let entry = this.selection.studies.get(regionId);
-      if (entry?.status === "loading" || entry?.result) return;
-      if (this.setupRequired && (retry || !entry?.jobId)) return;
-      entry ||= {};
+      if (!entry?.jobId || entry.status === "loading" || entry.result) return;
       entry.status = "loading";
       entry.error = null;
       this.selection.studies.set(regionId, entry);
-      this.ui.renderStudy();
+      this.ui.renderGrammar();
       const revision = this.selectionRevision;
       const generation = this.generation,
         runId = this.selection.run.run_id;
@@ -757,19 +756,9 @@
           this.selection.run.analysis.regions[this.selection.regionIndex]?.id === regionId
         )
           if (includeWords) this.ui.renderTranslation();
-          else this.ui.renderStudy();
+          else this.ui.renderGrammar();
       };
       try {
-        if (retry && entry.jobId) {
-          const response = await this.submit("retry", { jobId: entry.jobId });
-          entry.jobId = response.jobId;
-          entry.cached = !!response.cached;
-          entry.final = false;
-        } else if (!entry.jobId) {
-          const response = await this.submit("study", { runId, regionId });
-          entry.jobId = response.jobId;
-          entry.cached = !!response.cached;
-        }
         if (!this.valid(generation, revision)) return;
         this.poll(
           entry.jobId,
@@ -795,8 +784,7 @@
       }
     }
   }
-  if (typeof module !== "undefined" && module.exports)
-    module.exports = { SelectionOverlay, normalizeRect, pixelCrop, placeCard };
+  if (typeof module !== "undefined" && module.exports) module.exports = { SelectionOverlay };
   else if (!globalThis.__mangaSelectionOverlay) {
     const runtime = (globalThis.browser ?? globalThis.chrome)?.runtime;
     if (!runtime) return;

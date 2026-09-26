@@ -11,7 +11,8 @@
   cursor: help;
 }
 .jp-word:hover,
-.jp-word:focus-visible {
+.jp-word:focus-visible,
+.jp-word[data-pinned] {
   background: var(--manga-hover);
   color: var(--manga-accent);
 }
@@ -47,4 +48,83 @@
 .jp-gloss .jp-meaning {
   margin: 8px 0 0;
   font-size: 13px;
+}
+
+.jp-gloss .jp-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.jp-gloss .jp-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--manga-border);
+  border-radius: var(--manga-radius);
+  padding: 0;
+  font: 600 18px/1 var(--manga-font);
+  color: var(--manga-accent);
+  background: transparent;
+  cursor: pointer;
+}
+.jp-gloss .jp-action:hover:not(:disabled) {
+  background: var(--manga-hover);
+}
+.jp-gloss .jp-action-label {
+  width: auto;
+  padding: 0 10px;
+  font: 500 13px/1.5 var(--manga-font);
+}
+.jp-gloss .jp-action:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.jp-gloss .jp-action:focus-visible,
+.jp-gloss .jp-edit-input:focus-visible {
+  outline: 2px solid var(--manga-focus);
+  outline-offset: 2px;
+}
+.jp-gloss .jp-status {
+  margin: 8px 0 0;
+  font: inherit;
+}
+.jp-gloss .jp-status:empty {
+  display: none;
+}
+.jp-gloss .jp-edit-label {
+  display: block;
+  margin-top: 12px;
+  font: inherit;
+}
+.jp-gloss .jp-edit-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px solid var(--manga-border);
+  border-radius: var(--manga-radius);
+  background: var(--manga-surface);
+  color: var(--manga-text);
+  font: inherit;
+}
+.jp-gloss textarea.jp-edit-input {
+  min-height: 64px;
+  resize: vertical;
+}
+.jp-gloss [hidden] {
+  display: none !important;
+}
+
+.jp-gloss .jp-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

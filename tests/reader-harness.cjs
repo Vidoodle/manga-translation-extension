@@ -285,24 +285,11 @@ function harness(handler) {
       calls.push(message);
       const custom = handler && (await handler(message, fixture));
       if (custom !== undefined) return custom;
-      if (["manga:capture", "manga:verify-capture"].includes(message.type))
-        return { ok: true, imageDataUrl: fixture.screenshot };
-      if (message.type === "manga:page-list")
-        return { ok: true, pages: fixture.page ? [fixture.page] : [] };
-      if (message.type === "manga:page-get")
-        return { ok: true, page: fixture.page, regions: fixture.regions };
-      if (message.type === "manga:page-save") {
-        fixture.page = { ...message.page, id: "page-a" };
-        return { ok: true, pageId: "page-a" };
-      }
+      if (message.type === "manga:capture") return { ok: true, imageDataUrl: fixture.screenshot };
       if (message.type === "manga:analyze") {
         portStatus(1);
         fixture.regions.push({ id: "saved-a", runId: "run-a", model: "test/model", ...message });
         return { ok: true, jobId: "translation-job" };
-      }
-      if (message.type === "manga:study") {
-        portStatus(1);
-        return { ok: true, jobId: `study-${message.regionId}` };
       }
       if (message.type === "manga:retry") {
         portStatus(1);
@@ -318,8 +305,6 @@ function harness(handler) {
           },
         };
       }
-      if (message.type === "manga:reopen")
-        return { ok: true, result: run(), imageDataUrl: fixture.regions[0]?.imageDataUrl };
       return { ok: true };
     },
   };

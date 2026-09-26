@@ -14,7 +14,7 @@ async function main() {
   const directory = path.join(root, "src/icons");
   const write = async (source, size, file) =>
     sharp(Buffer.from(source)).resize(size, size).png().toFile(path.join(directory, file));
-  for (const size of [16, 32, 48, 64, 96, 128]) {
+  for (const size of [48, 64, 96, 128]) {
     await write(brand, size, `icon-${size}.png`);
   }
   for (const size of [16, 32, 64]) {

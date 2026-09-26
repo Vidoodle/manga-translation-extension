@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { normalizeRect, pixelCrop, placeCard } = require("../src/reader/content.js");
+const { normalizeRect, pixelCrop, placeCard } = require("../src/reader/vision.js");
 const { harness, settle, run, study } = require("./reader-harness.cjs");
 const wordButton = (env) =>
   env.overlay.ui.body.querySelectorAll("button").find((button) => button.className === "jp-word");
@@ -163,14 +163,13 @@ test("setup-required history keeps its translation readable and disables model c
   assert.match(env.text(env.overlay.ui.card), /Complete extension setup/);
   env.overlay.selection.regionIndex = 1;
   env.overlay.ui.renderTranslation();
-  assert.equal(env.overlay.ui.studyRoot.querySelectorAll("button").length, 0);
+  assert.equal(env.overlay.ui.grammarRoot.querySelectorAll("button").length, 0);
   assert.equal(
     env.overlay.ui.body
       .querySelectorAll("button")
       .find((button) => button.attributes["aria-label"] === "Change model").disabled,
     true,
   );
-  await env.overlay.requestStudy("r2");
   await env.overlay.compareModel("other/model");
   await env.overlay.restart();
   assert.equal(env.calls.length, 0);
@@ -199,8 +198,7 @@ test("setup-required failed history cannot retry translations or study jobs", as
     },
   });
   const before = env.calls.length;
-  assert.equal(env.overlay.ui.studyRoot.querySelectorAll("button").length, 0);
-  await env.overlay.requestStudy("r1", true);
+  assert.equal(env.overlay.ui.grammarRoot.querySelectorAll("button").length, 0);
   assert.equal(env.calls.length, before);
   env.overlay.close();
 });
@@ -216,42 +214,9 @@ test("setup-required history can still check an existing study job", async () =>
     },
   });
   await settle();
-  assert.equal(env.overlay.selection.studies.get("r1")?.status, "completed");
   assert.deepEqual(
     env.calls.map((message) => message.type),
     ["manga:poll"],
-  );
-  env.overlay.close();
-});
-
-test("losing setup while a history card is open updates the notice and blocks further submissions", async () => {
-  const env = harness((message) =>
-    message.type === "manga:study"
-      ? {
-          ok: false,
-          code: "setup-key",
-          error: "Add your OpenRouter API key in the extension, then activate again.",
-        }
-      : undefined,
-  );
-  env.start({ history: { result: run(), imageDataUrl: "fixture:page" } });
-  await env.overlay.requestStudy("r1");
-  await settle();
-  assert.match(env.text(env.overlay.ui.card), /Add your OpenRouter API key/);
-  assert.match(env.text(env.overlay.ui.body), /Natural 1/);
-  assert.equal(env.overlay.ui.studyRoot.querySelectorAll("button").length, 0);
-  assert.doesNotMatch(env.text(env.overlay.ui.card), /Select another area/);
-  assert.equal(
-    env.overlay.ui.body
-      .querySelectorAll("button")
-      .find((button) => button.attributes["aria-label"] === "Change model").disabled,
-    true,
-  );
-  await env.overlay.requestStudy("r1");
-  await env.overlay.compareModel("other/model");
-  assert.deepEqual(
-    env.calls.map((message) => message.type),
-    ["manga:study"],
   );
   env.overlay.close();
 });
@@ -445,7 +410,7 @@ test("another release cannot capture or submit twice while the screenshot is pen
   assert.equal(env.calls.filter((message) => message.type === "manga:analyze").length, 1);
   env.overlay.close();
 });
-test("translation and study completion keep the card visible without another screenshot", async () => {
+test("translation completion keeps the card visible without another screenshot", async () => {
   const env = harness((message) =>
     message.type === "manga:verify-capture"
       ? { ok: false, code: "capture-access", error: "Unexpected screenshot" }
@@ -463,10 +428,7 @@ test("translation and study completion keep the card visible without another scr
   const captures = env.calls.filter((message) => message.type.includes("capture")).length;
   env.fire(3000);
   await settle();
-  await env.overlay.requestStudy("r1");
-  await settle();
   assert.equal(env.overlay.ui.card, card);
-  assert.equal(env.overlay.selection.studies.get("r1")?.status, "completed");
   assert.equal(env.calls.filter((message) => message.type.includes("capture")).length, captures);
   assert.equal(env.calls.filter((message) => message.type === "manga:verify-capture").length, 0);
   assert.equal(env.overlay.ui.host.style.visibility, "visible");
@@ -769,61 +731,6 @@ test("detached model comparison identifies the original stored input explicitly"
   assert.equal(env.calls.filter((message) => message.type === "manga:capture").length, 0);
 });
 
-test("late study cannot replace another text group and repeated study is deduplicated", async () => {
-  let resolveStudy;
-  const env = harness((message) =>
-    message.type === "manga:poll" && message.jobId === "study-r1"
-      ? new Promise((resolve) => {
-          resolveStudy = resolve;
-        })
-      : undefined,
-  );
-  env.start();
-  env.select();
-  await settle();
-  env.overlay.requestStudy("r1");
-  env.overlay.requestStudy("r1");
-  await settle();
-  env.overlay.selection.regionIndex = 1;
-  env.overlay.ui.renderTranslation();
-  resolveStudy({ ok: true, job: { status: "completed", result: study("r1") } });
-  await settle();
-  assert.match(env.text(env.overlay.ui.body), /Natural 2/);
-  assert.doesNotMatch(env.text(env.overlay.ui.body), /Helpful explanation/);
-  env.overlay.selection.regionIndex = 0;
-  env.overlay.ui.renderTranslation();
-  assert.equal(env.overlay.selection.studies.get("r1")?.status, "completed");
-  wordButton(env).dispatch("pointerenter");
-  assert.match(env.text(env.overlay.ui.wordHelp.tip), /にほんご/);
-  assert.equal(env.calls.filter((m) => m.type === "manga:study").length, 1);
-  env.overlay.close();
-});
-
-test("failed study history preserves translation and retries its own job", async () => {
-  const env = harness();
-  env.start({
-    history: {
-      result: run(),
-      imageDataUrl: "fixture:page",
-      studyJob: {
-        job_id: "study-r1",
-        region_id: "r1",
-        status: "interrupted",
-        error: "Connection lost",
-      },
-    },
-  });
-  await settle();
-  assert.match(env.text(env.overlay.ui.body), /Natural 1/);
-  assert.equal(env.overlay.ui.studyRoot.querySelectorAll("button").length, 0);
-  assert.equal(env.overlay.selection.studies.get("r1").jobId, "study-r1");
-  assert.equal(env.calls.filter((message) => message.type === "manga:retry").length, 0);
-  await env.overlay.requestStudy("r1", true);
-  await settle();
-  assert.equal(env.calls.find((message) => message.type === "manga:retry").jobId, "study-r1");
-  assert.equal(env.overlay.selection.studies.get("r1")?.status, "completed");
-});
-
 test("translation history recognizes backend job_id and requires explicit charged retry", async () => {
   const env = harness();
   env.start({
@@ -906,26 +813,6 @@ test("explicit paid retry from history removes the saved translation label", asy
   assert.equal(env.overlay.selection.cached, false);
   assert.match(env.text(env.overlay.ui.body), /Natural 1/);
   assert.doesNotMatch(env.text(env.overlay.ui.body), /Saved translation/);
-});
-
-test("a legacy failed study submission keeps its job without offering another paid action", async () => {
-  const env = harness((message) =>
-    message.type === "manga:study"
-      ? { ok: false, code: "failed", jobId: "study-r1", error: "Invalid output" }
-      : undefined,
-  );
-  env.start();
-  env.select();
-  await settle();
-  await env.overlay.requestStudy("r1");
-  await settle();
-  const entry = env.overlay.selection.studies.get("r1");
-  assert.equal(entry.jobId, "study-r1");
-  assert.equal(entry.status, "error");
-  assert.equal(entry.final, true);
-  assert.equal(env.overlay.ui.studyRoot.querySelectorAll("button").length, 0);
-  assert.equal(env.calls.filter((message) => message.type === "manga:study").length, 1);
-  assert.equal(env.calls.filter((message) => message.type === "manga:retry").length, 0);
 });
 
 test("poll connection errors only check the existing job and unknown cost is not zero", async () => {

@@ -14,7 +14,7 @@ The extension talks directly to OpenRouter. It does not need a local server.
 
 Activation and dragging take no screenshots and make no model request. Releasing a valid selection captures the visible page once, crops exactly the selected rectangle, and requests its Japanese, natural English translation, vocabulary and grammar together. Hover, focus or tap an underlined Japanese word to see its reading and meaning. The result card focuses on Japanese, Translation and Grammar; it stays readable while you scroll. Opening word help or a saved translation makes no model call.
 
-New selection requires the key, model, OpenRouter access, and local cache to be ready. Before setup, the shortcut opens configuration if there are no saved translations; otherwise it opens the in-page library so existing answers remain readable. First-time setup contains only connection and model choices. Reading a saved translation makes no provider request. A cache failure has its own error and does not prevent saving a key or changing settings. Opening the welcome screen loads neither the model catalog nor saved reading data.
+New selection requires the key, model, OpenRouter access, and local cache to be ready. Before setup, the shortcut opens configuration if there are no saved translations; otherwise it opens the in-page library so existing answers remain readable. First-time setup includes connection, model choice and an optional Anki step. Reading a saved translation makes no provider request. A cache failure has its own error and does not prevent saving a key or changing settings. Opening the welcome screen loads neither the model catalog nor saved reading data.
 
 The reader does not scan pages, recognize previous selections, restore outlines, or snap a new rectangle to an old one. Each drag uses your exact selection. Clicking a **Saved translations** entry reopens the same in-page card with its original captured crop and answer over your current viewport. It does not navigate or scroll the book, take a new screenshot, or submit another translation. Exact request deduplication still prevents concurrent identical submissions and can return an already saved result for identical input and settings.
 
@@ -30,11 +30,11 @@ Temporary installations disappear when Firefox restarts. Persistent installation
 
 Use Mozilla's **unlisted / self-distributed** signing option. The extension does not need a public store listing.
 
-1. Package the contents of `src` into a ZIP, with `manifest.json` at the ZIP root. The packaging command below creates `dist/manga-translation-extension.zip`; it includes only extension source, not your saved key or reading cache.
+1. Run `pnpm check` and `pnpm package`. This creates a versioned ZIP under `dist/`, with `manifest.json` at the ZIP root. It contains only extension source, not your saved key or reading cache.
 2. Sign in at the [Mozilla submission page](https://addons.mozilla.org/developers/addon/submit/), choose **On your own**, and upload the ZIP. Follow the validation/signing steps, then download the signed `.xpi` from your submission's version page.
 3. In Firefox, open `about:addons`, use the gear menu's **Install Add-on From File**, and select that signed `.xpi`. This installation remains after Firefox restarts.
 
-For future updates, increase the manifest version, keep the same extension ID, and sign/install the updated package. Editing this project's files does not update an installed signed copy. See Mozilla's [signing instructions](https://extensionworkshop.com/documentation/publish/submitting-an-add-on/#self-distribution) and [file-install instructions](https://extensionworkshop.com/documentation/publish/install-self-distributed/).
+For future updates, use the [release workflow](docs/releases.md) to update both versions and the changelog, keep the same extension ID, and sign/install the updated package. Editing this project's files does not update an installed signed copy. See Mozilla's [signing instructions](https://extensionworkshop.com/documentation/publish/submitting-an-add-on/#self-distribution) and [file-install instructions](https://extensionworkshop.com/documentation/publish/install-self-distributed/).
 
 ## Model and data choices
 
@@ -42,7 +42,7 @@ For future updates, increase the manifest version, keep the same extension ID, a
 - Requests explicitly use minimal reasoning for Flash-Lite, low reasoning for Luna, and a 1,024-token reasoning budget for Qwen3.8 Flash. Gemini 3 Flash Preview, 3.1 Pro Preview, 3.8 Flash, DeepSeek V4.1 Flash, Claude Sonnet 5 and GLM-5.3 Flash use low reasoning. These controls reduce the requested reasoning work; they do not guarantee cost or latency. Models without a verified configuration keep their provider settings. The 8,192-token translation output allowance remains available for Japanese, English, vocabulary, grammar and reasoning.
 - Save a key only on a computer you trust, under your own password-protected computer account. Avoid public computers and logins shared with people you don’t trust. Create a separate key for this extension with a low spending limit in [OpenRouter’s key settings](https://openrouter.ai/settings/keys). If it may have been copied, delete it there and create a replacement; removing it from the extension does not disable a copied key. The key stays in local extension storage without encryption; it is not synced or exposed to BookWalker.
 - Full screenshots stay local and are used only to produce the selected crop. The crop goes to OpenRouter and the chosen provider; the reader no longer creates page references.
-- This update clears older completed answers and page/region references once. Non-completed request records and source translations needed for their explicit retry are preserved, along with the key and settings. New completed answers survive restarts subject to normal cache limits.
+- Version 0.5.6 removes obsolete page-placement storage while retaining current saved translations, credentials, settings and unresolved request records. Very old version-1 databases also receive the historical answer-format migration.
 - Unknown request outcomes require a deliberate retry because the earlier request may already have been charged. Cache eviction bounds ordinary saved data; **Clear saved data** preserves active/unresolved request records and their required sources.
 
 The [live model screening](docs/model-benchmark-2026-09-25.md) compares 33 OpenRouter attempts on eight original Japanese crop fixtures using the production provider module. It favors Flash-Lite for speed/value and Gemini 3 Flash Preview for cleaner learner help in this small sample. The separate [Qwen follow-up](docs/qwen-diagnostics-2026-09-25.md) found both Alibaba shared-pool rate limits and invalid array-shaped answers despite a correctly forwarded object schema. No tested configuration established reliable Qwen behavior. Version 0.4.4 updates the shortlist and identifies a confirmed shared-provider rate limit in the error message; it does not claim to repair Qwen's upstream behavior.
@@ -51,9 +51,9 @@ The [broader family screening](docs/model-benchmark-broader-2026-09-25.md) adds 
 
 Actual installed Firefox/BookWalker behavior remains unverified. The supported computer-use tool blocked Firefox inspection because URL-policy enforcement is unsupported for that browser. Live provider requests from Node and synthetic browser fixtures do not establish installed-browser compatibility; see [validation status](docs/validation.md).
 
-## Proposed Anki support
+## Anki word mining
 
-The [Anki word-mining proposal](docs/anki-mining.md) describes one-click word export with a saved deck, note type and field mapping, carrying the captured Japanese and full English translation. It is a discussion draft; Anki integration is not implemented yet.
+Version 0.5.0 adds optional AnkiConnect support. Anki is an optional final setup step, with **Skip for now**; it also remains under **Settings → Anki → Configure**. Choose your existing deck, note type and field mapping. In a Japanese word popup, **+** adds the word with its reading, meaning, captured Japanese and full translation; the pencil lets you edit first. Mining makes no new model request. See the [Anki setup guide](docs/anki-mining.md). Kaishi mappings automatically include word furigana, Japanese context on both sides and readable spacing. Live AnkiConnect rendering was verified with a temporary test note that was removed afterward. Installed Firefox/BookWalker interaction remains unverified.
 
 ## Develop
 
@@ -61,21 +61,14 @@ Node 22 or newer and pnpm are needed for development checks. The installed exten
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm test
-pnpm format:check
+pnpm check
+pnpm package
 pnpm test:browser
 ```
 
 The browser fixture runs at `http://127.0.0.1:17843/reader`; native IndexedDB checks are at `/idb`. It uses actual extension modules, synthetic page pixels, and a simulated OpenRouter transport. It makes no external model calls. It supplements the tests; it does not prove behavior in installed Firefox or BookWalker.
 
-On Windows, run these built-in PowerShell commands from the project root to produce the upload ZIP, without changing the system's script execution policy:
-
-```powershell
-New-Item -ItemType Directory -Force -Path dist | Out-Null
-Compress-Archive -Path .\src\* -DestinationPath .\dist\manga-translation-extension.zip -Force
-```
-
-`scripts/package.ps1` also packages the source on systems that permit local scripts. The ZIP still needs Mozilla signing for permanent installation. Load `src/manifest.json` directly during development.
+`pnpm package` uses Mozilla’s pinned `web-ext` tool to produce `dist/manga-reading-assistant-<version>.zip` and its SHA-256 checksum. The ZIP still needs Mozilla signing for permanent installation. Load `src/manifest.json` directly during development. See [release instructions](docs/releases.md) and the [changelog](CHANGELOG.md).
 
 ```text
 src/

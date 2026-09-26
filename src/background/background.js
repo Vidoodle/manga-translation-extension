@@ -17,6 +17,7 @@
     const provider = dependencies.provider || MangaProvider;
     const settings =
       dependencies.settings || new MangaSettings.SettingsService(extension, provider);
+    const anki = dependencies.anki || new MangaAnki.AnkiService(extension);
     let reader;
     const jobs = new MangaJobs.RequestService({
       store,
@@ -28,10 +29,8 @@
       extension,
       settings,
       jobs,
-      digest: MangaJobs.digest,
       loadStyles: dependencies.loadStyles,
     });
-    const pages = new MangaPages.PageService(store, MangaReader, MangaJobs);
     const ready = Promise.all([store.open(), reader.ready]);
     ready.catch(() => {});
     const activeTab = async () =>
@@ -95,7 +94,6 @@
           jobs.translation({
             imageDataUrl: original.input.imageDataUrl,
             context: original.input.context,
-            associations: original.associations,
             model: message.model,
             retryJobId: message.retryJobId,
           }),
@@ -103,17 +101,24 @@
       }
 
       if (!session.captures.length) throw new Error("Select the visible text first.");
-      const imageDataUrl = MangaPages.image(message.imageDataUrl);
+      const imageDataUrl = message.imageDataUrl;
+      if (
+        typeof imageDataUrl !== "string" ||
+        imageDataUrl.length > 28 * 1024 * 1024 ||
+        !/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(imageDataUrl)
+      )
+        throw new Error("The selected image is invalid or too large. Select a smaller area.");
+      const viewport = MangaReader.viewport(message.viewport);
+      if (!viewport || !MangaReader.rectangle(message.rect, viewport))
+        throw new Error("Select a rectangle inside the visible page.");
       const context = message.context ?? "";
       if (typeof context !== "string" || context.length > 12000)
         throw new Error("Reading context must be at most 12,000 characters.");
 
-      const association = await pages.association(session.scope, message);
       return ownSubmission(session, () =>
         jobs.translation({
           imageDataUrl,
           context,
-          association,
           model: message.model || session.model,
           retryJobId: message.retryJobId,
         }),
@@ -127,17 +132,6 @@
         await reader.ownRun(session, job.result.run_id);
 
       return { ok: true, job };
-    }
-
-    async function requestStudy(session, message) {
-      requireRun(session, message.runId);
-      await reader.active(session);
-      if (session.closed)
-        throw new Error("Open the saved translation before requesting an explanation.");
-
-      return ownSubmission(session, () =>
-        jobs.study(message.runId, message.regionId, message.retryJobId),
-      );
     }
 
     async function retryRequest(session, jobId) {
@@ -166,8 +160,26 @@
       if (!reader.popupSender(sender))
         throw new Error("This request is only available from extension settings.");
       switch (message.type) {
+        case "manga:popup-anki-config":
+          return { ok: true, config: await anki.config() };
+        case "manga:popup-anki-connect":
+          return { ok: true, ...(await anki.catalog(message.apiKey)) };
+        case "manga:popup-anki-fields": {
+          const fields = await anki.fields(message.model, message.apiKey);
+          return { ok: true, fields, preset: MangaAnki.kaishiPreset(fields) };
+        }
+        case "manga:popup-anki-save":
+          await anki.save(message.config);
+          return { ok: true };
+        case "manga:popup-anki-disconnect":
+          await anki.disconnect();
+          return { ok: true };
+
         case "manga:popup-config":
           return { ok: true, config: await settings.config() };
+        case "manga:popup-finish-setup":
+          await settings.finishSetup();
+          return { ok: true };
         case "manga:popup-save-key":
           await settings.saveKey(message.apiKey);
           return { ok: true };
@@ -208,6 +220,21 @@
       await ready;
       const session = await reader.authenticate(message, sender);
       switch (message.type) {
+        case "manga:anki-add": {
+          requireOpen(session);
+          requireRun(session, message.runId);
+          const source = await jobs.source(message.runId);
+          if (!source?.result) throw new Error("This translation is no longer saved.");
+          return {
+            ok: true,
+            ...(await anki.add(
+              source.result,
+              message.regionIndex,
+              message.wordIndex,
+              message.edits,
+            )),
+          };
+        }
         case "manga:cancel":
           session.closed = true;
           await reader.save();
@@ -219,7 +246,6 @@
           await settings.saveCardPosition(message.position);
           return { ok: true };
         case "manga:capture":
-        case "manga:verify-capture":
           return { ok: true, imageDataUrl: await reader.capture(session, message) };
         case "manga:models":
           return { ok: true, catalog: await settings.models(true) };
@@ -231,26 +257,10 @@
         }
         case "manga:history":
           return openHistory(session, message.id);
-        case "manga:page-list":
-          return { ok: true, pages: await pages.list(session.scope) };
-        case "manga:page-get": {
-          const result = await pages.get(session.scope, message.pageId, {
-            includeReference: message.includeReference !== false,
-          });
-          for (const region of result.regions) await reader.ownRun(session, region.runId);
-          return { ok: true, ...result };
-        }
-        case "manga:page-save":
-          return { ok: true, pageId: await pages.save(session.scope, message.page) };
         case "manga:analyze":
           return analyzeSelection(session, message);
         case "manga:poll":
           return pollRequest(session, message.jobId);
-        case "manga:reopen":
-          requireRun(session, message.runId);
-          return { ok: true, ...(await jobs.reopen(message.runId)) };
-        case "manga:study":
-          return requestStudy(session, message);
         case "manga:retry":
           return retryRequest(session, message.jobId);
         default:
@@ -302,7 +312,7 @@
     extension.tabs.onUpdated.addListener((tabId, change) => {
       if (change.url || change.status === "loading") void reader.invalidate(tabId).catch(() => {});
     });
-    return { ready, handle, listener, store, jobs, reader, settings, pages };
+    return { ready, handle, listener, store, jobs, reader, settings, anki };
   }
 
   globalThis.MangaBackground = { createBackground, errorResponse };

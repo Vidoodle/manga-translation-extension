@@ -61,9 +61,16 @@
     }
 
     async config() {
-      const stored = await this.local("get", [KEY, "selectedModel"]);
+      const stored = await this.local("get", [
+        KEY,
+        "selectedModel",
+        "ankiMining",
+        "ankiSetupPending",
+      ]);
       return {
         key_configured: Boolean(stored[KEY]),
+        anki_enabled: Boolean(stored.ankiMining?.enabled),
+        anki_setup_pending: Boolean(stored.ankiSetupPending),
         model: stored.selectedModel || "",
         shortcut: await this.shortcut(),
       };
@@ -116,7 +123,13 @@
     }
 
     async resetSetup() {
-      await this.changeSetup(() => this.local("remove", [KEY, "selectedModel"]));
+      await this.changeSetup(() =>
+        this.local("remove", [KEY, "selectedModel", "ankiSetupPending"]),
+      );
+    }
+
+    async finishSetup() {
+      await this.changeSetup(() => this.local("remove", "ankiSetupPending"));
     }
 
     async hasPermission() {
@@ -232,7 +245,11 @@
     async saveModel(model) {
       await this.changeSetup(async () => {
         await this.ensureModel(model);
-        await this.local("set", { selectedModel: model });
+        const stored = await this.local("get", "selectedModel");
+        await this.local("set", {
+          selectedModel: model,
+          ...(!stored.selectedModel ? { ankiSetupPending: true } : {}),
+        });
       });
     }
   }

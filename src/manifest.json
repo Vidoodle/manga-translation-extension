@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Manga Reading Assistant",
-  "version": "0.4.6",
+  "version": "0.5.6",
   "description": "Read manga in Japanese with translations, word help, and grammar explanations alongside the page.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -28,9 +28,21 @@
       "64": "icons/toolbar-dark-64.png"
     },
     "theme_icons": [
-      { "light": "icons/toolbar-light-16.png", "dark": "icons/toolbar-dark-16.png", "size": 16 },
-      { "light": "icons/toolbar-light-32.png", "dark": "icons/toolbar-dark-32.png", "size": 32 },
-      { "light": "icons/toolbar-light-64.png", "dark": "icons/toolbar-dark-64.png", "size": 64 }
+      {
+        "light": "icons/toolbar-light-16.png",
+        "dark": "icons/toolbar-dark-16.png",
+        "size": 16
+      },
+      {
+        "light": "icons/toolbar-light-32.png",
+        "dark": "icons/toolbar-dark-32.png",
+        "size": 32
+      },
+      {
+        "light": "icons/toolbar-light-64.png",
+        "dark": "icons/toolbar-dark-64.png",
+        "size": 64
+      }
     ]
   },
   "background": {
@@ -38,9 +50,9 @@
       "background/store.js",
       "background/provider.js",
       "background/settings.js",
+      "background/anki.js",
       "background/jobs.js",
       "background/reader-session.js",
-      "background/pages.js",
       "background/background.js"
     ]
   },
@@ -53,6 +65,7 @@
     }
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https://openrouter.ai"
-  }
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https://openrouter.ai http://127.0.0.1:8765"
+  },
+  "optional_host_permissions": ["http://127.0.0.1/*"]
 }

@@ -90,7 +90,7 @@ function fixture({ scrollOnBlur = false, scrollOnCardFocus = false, respond } = 
     browser: { runtime },
     MangaVision: require("../src/reader/vision.js"),
     ReaderView: require("../src/reader/reader-view.js"),
-    PageTracker: require("../src/reader/page-tracker.js"),
+    SelectionCapture: require("../src/reader/selection-capture.js"),
   });
   vm.runInContext(fs.readFileSync(require.resolve("../src/reader/content.js"), "utf8"), context);
   const overlay = context.__mangaSelectionOverlay;

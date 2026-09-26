@@ -38,11 +38,10 @@
   }
 
   class ReaderService {
-    constructor({ extension, settings, jobs, digest, loadStyles }) {
+    constructor({ extension, settings, jobs, loadStyles }) {
       this.extension = extension;
       this.settings = settings;
       this.jobs = jobs;
-      this.digest = digest;
       this.loadStyles = loadStyles || (() => this.readPackagedStyles());
       this.stylesPromise = null;
       this.sessions = new Map();
@@ -144,18 +143,6 @@
       return true;
     }
 
-    async scope(url) {
-      const parsed = new URL(url);
-      // Queries/fragments can identify a book. Hash them instead of recording private URL tokens.
-      return (
-        parsed.origin +
-        parsed.pathname +
-        (parsed.search || parsed.hash
-          ? "#scope=" + (await this.digest(parsed.search + parsed.hash))
-          : "")
-      );
-    }
-
     async active(session) {
       const [tab] = await this.extension.tabs.query({ active: true, windowId: session.windowId });
       if (tab?.id !== session.tabId || tab?.url !== session.url)
@@ -204,14 +191,12 @@
         tabId: tab.id,
         windowId: tab.windowId,
         url: tab.url,
-        scope: await this.scope(tab.url),
         model: config.model,
         readOnly: Boolean(setup),
         createdAt: Date.now(),
         closed: false,
         jobs: [],
         runs: [],
-        pages: [],
         captures: [],
       };
       if (!latest()) return { ok: true };
@@ -231,7 +216,7 @@
             "shared/japanese.js",
             "reader/vision.js",
             "reader/reader-view.js",
-            "reader/page-tracker.js",
+            "reader/selection-capture.js",
             "reader/content.js",
           ],
         });
@@ -255,6 +240,7 @@
             model: config.model,
             cardPosition,
             shortcut: config.shortcut,
+            ankiEnabled: config.anki_enabled,
             readerCss,
             setupWarning: setup?.message || "",
             setupRequired: Boolean(setup),
@@ -296,14 +282,12 @@
       await this.active(session);
       const now = Date.now();
       const recent = session.captures.filter((time) => now - time < 1000);
-      const allowedBurst = message.type === "manga:verify-capture" || session.captures.length < 3;
+      const allowedBurst = session.captures.length < 3;
       if (
         this.capturing.has(session.windowId) ||
         (recent.length && (!allowedBurst || recent.length >= 3))
       ) {
-        const error = new Error(
-          "The page capture is settling. Try the visual check again shortly.",
-        );
+        const error = new Error("The page capture is settling. Select the area again shortly.");
         error.code = "capture-throttled";
         error.retryAfterMs = 1100;
         throw error;

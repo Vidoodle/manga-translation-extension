@@ -1,6 +1,6 @@
 {
   "name": "manga-reading-assistant",
-  "version": "0.4.6",
+  "version": "0.5.6",
   "private": true,
   "description": "A Firefox extension for studying Japanese manga in the reader.",
   "engines": {
@@ -10,11 +10,17 @@
   "scripts": {
     "test": "node --test tests/*.test.cjs",
     "test:browser": "node scripts/browser-fixture.cjs",
+    "release:check": "node scripts/release.cjs check",
+    "release:version": "node scripts/release.cjs version",
+    "lint:firefox": "node scripts/release.cjs lint",
+    "package": "node scripts/release.cjs build",
+    "check": "pnpm test && pnpm format:check && pnpm release:check && pnpm lint:firefox",
     "format": "prettier --write \"src/**/*.{js,html,css,json}\" \"tests/**/*.{cjs,js,html}\" \"scripts/**/*.cjs\"",
     "format:check": "prettier --check \"src/**/*.{js,html,css,json}\" \"tests/**/*.{cjs,js,html}\" \"scripts/**/*.cjs\""
   },
   "devDependencies": {
     "fake-indexeddb": "6.2.5",
-    "prettier": "3.9.9"
+    "prettier": "3.9.9",
+    "web-ext": "10.7.0"
   }
 }

@@ -145,6 +145,8 @@ test("a synchronous IndexedDB security failure preserves settings and blocks cac
   assert.equal(initial.ok, true);
   assert.deepEqual(initial.config, {
     key_configured: true,
+    anki_enabled: false,
+    anki_setup_pending: false,
     model: "test/cheap",
     shortcut: "Alt+Q",
   });

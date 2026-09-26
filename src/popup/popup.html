@@ -47,6 +47,13 @@
         </div>
         <button id="edit-connection" class="text-button">Manage key</button>
       </div>
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">Anki</span>
+          <p class="hint">Save words with their context</p>
+        </div>
+        <button id="edit-anki" class="text-button">Configure</button>
+      </div>
       <details id="shortcut-settings">
         <summary>Shortcut: <kbd id="shortcut">Loading…</kbd></summary>
         <label for="shortcut-input">Key combination</label>
@@ -88,6 +95,49 @@
         <p class="hint">Remove your key and model choice to start setup again.</p>
       </div>
     </section>
+    <section id="anki-step" hidden>
+      <p id="anki-step-label" class="eyebrow">SETTINGS</p>
+      <h2>Anki word mining</h2>
+      <p id="anki-optional" class="hint" hidden>
+        Save words as flashcards while you read. You can skip this and set it up later in settings.
+      </p>
+      <p class="hint">
+        Keep Anki Desktop open with
+        <a href="https://ankiweb.net/shared/info/2055492159" target="_blank" rel="noreferrer"
+          >AnkiConnect</a
+        >
+        installed. Add words from their reading popup, together with the Japanese context and full
+        translation.
+      </p>
+      <details class="anki-credentials">
+        <summary>AnkiConnect API key (optional)</summary>
+        <label for="anki-key">Key from your AnkiConnect configuration</label>
+        <input id="anki-key" type="password" autocomplete="off" spellcheck="false" />
+        <p id="anki-key-hint" class="fine">Only needed if you set a key in AnkiConnect.</p>
+      </details>
+      <button id="anki-connect">Connect to Anki</button>
+      <div id="anki-fields" hidden>
+        <label for="anki-deck">Deck</label
+        ><select id="anki-deck"></select>
+        <label for="anki-model">Note type</label
+        ><select id="anki-model"></select>
+        <p id="anki-mapping-hint" class="hint">
+          Choose what each field contains. Values are combined in the order shown.
+        </p>
+        <div id="anki-mapping"></div>
+        <p class="fine">
+          Anki checks the first field for duplicates within this note type. Put Word there. Use a
+          regular note type; cloze cards aren’t generated.
+        </p>
+        <button id="anki-save" class="primary">Save Anki settings</button>
+      </div>
+      <p id="anki-status" role="status" aria-live="polite"></p>
+      <div class="step-actions">
+        <button id="anki-back" class="quiet">Back to settings</button
+        ><button id="anki-skip" class="quiet" hidden>Skip for now</button
+        ><button id="anki-disconnect" class="text-button danger" hidden>Disconnect</button>
+      </div>
+    </section>
     <section id="restart-step" hidden>
       <h2>Reset connection?</h2>
       <p class="intro">
@@ -102,7 +152,7 @@
       </div>
     </section>
     <section id="key-step" hidden>
-      <p id="key-step-label" class="eyebrow">STEP 1 OF 2</p>
+      <p id="key-step-label" class="eyebrow">STEP 1 OF 3</p>
       <h2 id="key-heading">Connect OpenRouter</h2>
       <p class="hint">
         Translations include word help and grammar and are billed to your OpenRouter account.
@@ -156,7 +206,7 @@
       </div>
     </section>
     <section id="model-step" aria-labelledby="model-heading" hidden>
-      <p id="model-step-label" class="eyebrow">STEP 2 OF 2</p>
+      <p id="model-step-label" class="eyebrow">STEP 2 OF 3</p>
       <h2 id="model-heading">Choose your translation model</h2>
       <p id="recommendations-note" class="hint" hidden>
         Suggested starting points; compare results on your manga.
@@ -196,7 +246,7 @@
       </div>
       <div class="step-actions">
         <button id="model-back" class="quiet">Back</button
-        ><button id="finish-setup" class="primary" disabled>Finish setup</button>
+        ><button id="finish-setup" class="primary" disabled>Continue</button>
       </div>
     </section>
     <p id="setup-warning" class="hint"></p>
@@ -204,5 +254,6 @@
     <script src="../shared/models.js"></script>
     <script src="popup-format.js"></script>
     <script src="popup.js"></script>
+    <script src="anki-settings.js"></script>
   </body>
 </html>

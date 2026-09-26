@@ -47,6 +47,9 @@ async function harness(options = {}) {
       replaceChildren(...children) {
         this.children = children;
       },
+      append(...children) {
+        this.children.push(...children);
+      },
       appendChild(child) {
         this.children.push(child);
       },
@@ -70,6 +73,7 @@ async function harness(options = {}) {
   const extension = {
     permissions: {
       contains: async () => hasAccess,
+      remove: async () => true,
       request: async (request) => {
         assert.equal(gesture, true, "host permission must be requested directly from a click");
         calls.permissions.push(plain(request));
@@ -84,6 +88,11 @@ async function harness(options = {}) {
         if (response) return response;
         if (options.errors?.[message.type])
           return { ok: false, error: options.errors[message.type] };
+        if (message.type === "manga:popup-anki-config") return { ok: true, config: {} };
+        if (message.type === "manga:popup-anki-connect")
+          return { ok: true, decks: ["Japanese"], models: ["Basic"] };
+        if (message.type === "manga:popup-anki-fields")
+          return { ok: true, fields: ["Front", "Back"] };
         if (message.type === "manga:popup-config")
           return { ok: true, config: { ...config, shortcut } };
         if (message.type === "manga:popup-models")
@@ -106,10 +115,15 @@ async function harness(options = {}) {
         }
         if (message.type === "manga:popup-save-key") config.key_configured = true;
         if (message.type === "manga:popup-remove-key") config.key_configured = false;
-        if (message.type === "manga:popup-save-model") config.model = message.model;
+        if (message.type === "manga:popup-save-model") {
+          if (!config.model) config.anki_setup_pending = true;
+          config.model = message.model;
+        }
+        if (message.type === "manga:popup-finish-setup") config.anki_setup_pending = false;
         if (message.type === "manga:popup-reset-setup") {
           config.key_configured = false;
           config.model = "";
+          config.anki_setup_pending = false;
         }
         return { ok: true };
       },
@@ -144,6 +158,7 @@ async function harness(options = {}) {
     MangaPopupFormat: format,
   });
   vm.runInContext(code, context);
+  vm.runInContext(fs.readFileSync(path.join(root, "anki-settings.js"), "utf8"), context);
   await new Promise((resolve) => setImmediate(resolve));
   return {
     calls,
@@ -168,7 +183,7 @@ const sent = (h, type) => h.calls.messages.filter((message) => message.type === 
 const virgin = { key_configured: false, model: "" };
 function visible(h, name) {
   assert.equal(h.element(`${name}-step`).hidden, false);
-  for (const other of ["welcome", "key", "model", "settings", "restart", "unavailable"])
+  for (const other of ["welcome", "key", "model", "settings", "restart", "unavailable", "anki"])
     if (other !== name) assert.equal(h.element(`${other}-step`).hidden, true);
   assert.equal(h.element("restart-confirm").hidden, name !== "restart");
   assert.equal(h.element("restart-setup").hidden, name !== "settings");
@@ -176,6 +191,8 @@ function visible(h, name) {
 function noPaidRequests(h) {
   const allowed = new Set([
     "popup-config",
+    "popup-anki-config",
+    "popup-finish-setup",
     "popup-models",
     "popup-save-key",
     "popup-remove-key",
@@ -212,7 +229,7 @@ test("virgin popup stays on welcome without catalog or cache work, even with pre
   }
 });
 
-test("first setup proceeds key then models then explicit Finish, with no paid requests", async () => {
+test("first setup proceeds key, model and optional Anki, with no paid requests", async () => {
   const h = await harness({ hasAccess: false, config: virgin });
   await h.fire("get-started");
   visible(h, "key");
@@ -242,6 +259,9 @@ test("first setup proceeds key then models then explicit Finish, with no paid re
   assert.equal(h.element("finish-setup").disabled, false);
   noPaidRequests(h);
   await h.fire("finish-setup");
+  visible(h, "anki");
+  assert.equal(h.element("anki-skip").hidden, false);
+  await h.fire("anki-skip");
   visible(h, "settings");
   assert.equal(sent(h, "popup-cache-stats").length, 1);
   noPaidRequests(h);
@@ -407,6 +427,9 @@ test("storage failures do not appear during setup; finishing surfaces them in Se
   await choose(h, "test/budget");
   assert.equal(sent(h, "popup-cache-stats").length, 0);
   await h.fire("finish-setup");
+  visible(h, "anki");
+  assert.equal(h.element("anki-skip").hidden, false);
+  await h.fire("anki-skip");
   visible(h, "settings");
   assert.equal(sent(h, "popup-cache-stats").length, 1);
   assert.match(h.element("cache-stats").textContent, /Firefox blocked/);
@@ -433,7 +456,7 @@ test("restart setup requires confirmation, preserves saved translations, and res
   visible(h, "restart");
   await h.fire("confirm-restart");
   visible(h, "welcome");
-  assert.deepEqual(h.config, { key_configured: false, model: "" });
+  assert.deepEqual(h.config, { key_configured: false, model: "", anki_setup_pending: false });
   assert.equal(sent(h, "popup-reset-setup").length, 1);
   assert.equal(sent(h, "popup-clear-cache").length, 0);
   assert.match(h.element("status").textContent, /saved translations.*kept/);
@@ -958,4 +981,129 @@ test("existing users can repair permission or replace a key without reentering m
   visible(h, "settings");
   visible(h, "settings");
   noPaidRequests(h);
+});
+
+test("Anki configuration is optional, requests local permission from a click and maps Basic fields", async () => {
+  const initial = await harness({ config: virgin });
+  assert.equal(initial.element("anki-step").hidden, true);
+  assert.equal(
+    initial.calls.messages.some((m) => m.type.includes("anki")),
+    false,
+  );
+  const h = await harness();
+  await h.fire("edit-anki");
+  assert.equal(h.element("anki-step").hidden, false);
+  assert.equal(h.element("settings-step").hidden, true);
+  await h.fire("anki-connect");
+  assert.deepEqual(h.calls.permissions.at(-1), { origins: ["http://127.0.0.1/*"] });
+  assert.equal(h.element("anki-fields").hidden, false);
+  assert.equal(h.element("anki-save").disabled, false);
+  await h.fire("anki-save");
+  assert.deepEqual(sent(h, "popup-anki-save")[0].config, {
+    deck: "Japanese",
+    model: "Basic",
+    apiKey: "",
+    mapping: { Front: ["word"], Back: ["reading", "meaning", "japanese", "translation"] },
+  });
+  visible(h, "settings");
+  assert.match(h.element("status").textContent, /Anki is ready/);
+});
+
+test("Kaishi setup selects the preset and preserves an existing Word Furigana mapping", async () => {
+  const { kaishiPreset } = require("../src/background/anki.js");
+  const fields = [
+    "Word",
+    "Word Reading",
+    "Word Meaning",
+    "Word Furigana",
+    "Sentence",
+    "Sentence Meaning",
+    "Sentence Furigana",
+  ];
+  for (const existing of [false, true]) {
+    const h = await harness({
+      respond: (message) => {
+        if (message.type === "manga:popup-anki-config")
+          return {
+            ok: true,
+            config: existing
+              ? { model: "Kaishi 1.5k", mapping: { "Word Furigana": ["reading"] } }
+              : {},
+          };
+        if (message.type === "manga:popup-anki-connect")
+          return { ok: true, decks: ["Mined Words"], models: ["Kaishi 1.5k"] };
+        if (message.type === "manga:popup-anki-fields")
+          return { ok: true, fields, preset: kaishiPreset(fields) };
+      },
+    });
+    await h.fire("edit-anki");
+    await h.fire("anki-connect");
+    assert.match(h.element("anki-mapping-hint").textContent, /Kaishi/);
+    await h.fire("anki-save");
+    const config = sent(h, "popup-anki-save")[0].config;
+    assert.deepEqual(config.mapping.Word, ["word"]);
+    assert.deepEqual(config.mapping.Sentence, ["japanese"]);
+    assert.deepEqual(config.mapping["Sentence Meaning"], ["translation"]);
+    assert.deepEqual(config.mapping[existing ? "Word Furigana" : "Word Reading"], ["reading"]);
+  }
+});
+
+test("Anki denied permission or missing fields cannot save a partial setup", async () => {
+  const denied = await harness({ denied: true });
+  await denied.fire("edit-anki");
+  await denied.fire("anki-connect");
+  assert.equal(sent(denied, "popup-anki-connect").length, 0);
+  assert.equal(denied.element("anki-save").disabled, true);
+  const h = await harness({ errors: { "manga:popup-anki-fields": "Anki is closed" } });
+  await h.fire("edit-anki");
+  await h.fire("anki-connect");
+  assert.equal(h.element("anki-save").disabled, true);
+  assert.equal(h.element("anki-fields").hidden, true);
+  await h.fire("anki-save");
+  assert.equal(sent(h, "popup-anki-save").length, 0);
+});
+
+test("unfinished Anki onboarding resumes without contacting Anki and skipping persists completion", async () => {
+  const h = await harness({ config: { anki_setup_pending: true } });
+  visible(h, "anki");
+  assert.equal(h.element("anki-step-label").textContent, "STEP 3 OF 3 · OPTIONAL");
+  assert.equal(h.element("anki-skip").hidden, false);
+  assert.equal(h.element("anki-back").textContent, "Back");
+  assert.equal(h.element("anki-disconnect").hidden, true);
+  assert.equal(h.calls.permissions.length, 0);
+  assert.equal(sent(h, "popup-anki-connect").length, 0);
+  await h.fire("anki-skip");
+  assert.equal(h.config.anki_setup_pending, false);
+  visible(await harness({ config: h.config }), "settings");
+  assert.equal(sent(h, "popup-anki-save").length, 0);
+});
+
+test("Anki onboarding can return to model selection and finish with a saved mapping", async () => {
+  const h = await harness({ config: { anki_setup_pending: true } });
+  await h.fire("anki-back");
+  visible(h, "model");
+  assert.equal(h.element("finish-setup").hidden, false);
+  await h.fire("finish-setup");
+  visible(h, "anki");
+  await h.fire("anki-connect");
+  await h.fire("anki-save");
+  assert.equal(sent(h, "popup-anki-save").length, 1);
+  assert.equal(sent(h, "popup-finish-setup").length, 1);
+  visible(h, "settings");
+  visible(await harness({ config: h.config }), "settings");
+});
+
+test("Anki being offline does not prevent finishing setup without it", async () => {
+  const h = await harness({
+    config: { anki_setup_pending: true },
+    errors: { "manga:popup-anki-connect": "Open Anki and try again." },
+  });
+  await h.fire("anki-connect");
+  assert.match(h.element("anki-status").textContent, /Open Anki/);
+  assert.equal(h.element("anki-skip").disabled, false);
+  await h.fire("anki-skip");
+  visible(h, "settings");
+  await h.fire("edit-anki");
+  assert.equal(h.element("anki-skip").hidden, true);
+  assert.equal(h.element("anki-back").textContent, "Back to settings");
 });

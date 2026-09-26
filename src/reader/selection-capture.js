@@ -1,4 +1,4 @@
-/* One screenshot per explicit selection. Saved answers are browsed in the popup. */
+/* One screenshot per explicit selection. Saved answers are browsed in the in-page library. */
 (() => {
   "use strict";
   const { pixelCrop } =
@@ -6,7 +6,7 @@
       ? require("./vision.js")
       : globalThis.MangaVision;
 
-  class PageTracker {
+  class SelectionCapture {
     constructor(reader) {
       this.reader = reader;
       this.captureQueue = Promise.resolve();
@@ -102,6 +102,6 @@
       }
     }
   }
-  if (typeof module !== "undefined" && module.exports) module.exports = PageTracker;
-  else globalThis.PageTracker = PageTracker;
+  if (typeof module !== "undefined" && module.exports) module.exports = SelectionCapture;
+  else globalThis.SelectionCapture = SelectionCapture;
 })();

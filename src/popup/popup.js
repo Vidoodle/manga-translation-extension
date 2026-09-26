@@ -32,13 +32,13 @@ function setupReady() {
 
 function showStep(next) {
   step = next;
-  for (const name of ["welcome", "key", "model", "settings", "restart", "unavailable"])
+  for (const name of ["welcome", "key", "model", "settings", "restart", "unavailable", "anki"])
     $(`${name}-step`).hidden = step !== name;
   $("restart-setup").hidden = step !== "settings";
   $("restart-confirm").hidden = step !== "restart";
-  $("key-step-label").textContent = returningSettings ? "SETTINGS" : "STEP 1 OF 2";
+  $("key-step-label").textContent = returningSettings ? "SETTINGS" : "STEP 1 OF 3";
   $("key-heading").textContent = returningSettings ? "OpenRouter key" : "Connect OpenRouter";
-  $("model-step-label").textContent = returningSettings ? "SETTINGS" : "STEP 2 OF 2";
+  $("model-step-label").textContent = returningSettings ? "SETTINGS" : "STEP 2 OF 3";
   $("key-back").textContent = returningSettings ? "Back to settings" : "Back";
   $("model-back").textContent = returningSettings ? "Back to settings" : "Back";
   $("finish-setup").hidden = returningSettings;
@@ -271,7 +271,7 @@ async function refreshStats() {
   try {
     const { stats } = await request("popup-cache-stats");
     $("cache-stats").textContent = format.stats(stats);
-    cacheHasContent = stats.entries > 0 || stats.pages > 0 || stats.regions > 0;
+    cacheHasContent = stats.entries > 0;
     cacheAvailable = true;
     return true;
   } catch (error) {
@@ -374,8 +374,8 @@ $("model-back").addEventListener("click", () => {
   showStep("key");
 });
 $("finish-setup").addEventListener("click", () => {
-  if (step !== "model" || returningSettings || modelSaving) return;
-  return enterSettings();
+  if (step !== "model" || returningSettings || modelSaving || !setupReady()) return;
+  return ankiSettings.open(true);
 });
 $("edit-connection").addEventListener("click", () => {
   if (!configLoaded || step !== "settings" || settingsBusy()) return;
@@ -509,7 +509,7 @@ $("confirm-clear").addEventListener("click", async () => {
   try {
     const { stats } = await request("popup-clear-cache");
     $("cache-stats").textContent = format.stats(stats);
-    cacheHasContent = stats.entries > 0 || stats.pages > 0 || stats.regions > 0;
+    cacheHasContent = stats.entries > 0;
     $("clear-confirm").hidden = true;
     updateSetup();
     status("Saved data cleared. Unfinished requests, your key, and settings were kept.");
@@ -531,14 +531,14 @@ async function init() {
   if (results[0].status === "fulfilled") {
     config = { ...config, ...results[0].value.config };
     configLoaded = true;
-    returningSettings = Boolean(config.model);
+    returningSettings = Boolean(config.model) && !config.anki_setup_pending;
   } else status(results[0].reason.message, true);
   hasAccess = results[1].status === "fulfilled" && results[1].value;
   $("shortcut-input").value = config.shortcut;
   renderModels();
   if (!configLoaded) showStep("unavailable");
+  else if (config.anki_setup_pending && setupReady()) await ankiSettings.open(true);
   else if (returningSettings) await enterSettings();
   else if (connectionReady()) await enterModels();
   else showStep(config.key_configured ? "key" : "welcome");
 }
-init().catch((error) => status(error.message, true));

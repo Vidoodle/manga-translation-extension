@@ -400,3 +400,46 @@ a {
 .settings-reset .hint {
   margin: 4px 0 0;
 }
+
+/* Anki shares the existing settings spacing and controls. */
+#anki-step > .hint,
+#anki-fields > .hint {
+  margin-bottom: 12px;
+}
+#anki-step select {
+  width: 100%;
+  padding: 8px;
+  color: var(--manga-text);
+  background: var(--manga-surface-raised);
+}
+#anki-fields {
+  margin-top: 16px;
+}
+#anki-fields > select {
+  margin-bottom: 0;
+}
+#anki-fields > .hint {
+  margin-top: 12px;
+}
+#anki-connect {
+  margin-top: 12px;
+}
+.anki-map-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+  margin: 8px 0;
+}
+.anki-map-row label {
+  margin: 0;
+}
+#anki-mapping {
+  margin: 12px 0;
+}
+#anki-save {
+  margin-top: 12px;
+}
+#anki-status:not(:empty) {
+  margin-top: 12px;
+}

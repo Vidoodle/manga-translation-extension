@@ -5,7 +5,7 @@ const provider = require("../src/background/provider.js");
 const settings = require("../src/background/settings.js");
 const jobs = require("../src/background/jobs.js");
 const reader = require("../src/background/reader-session.js");
-const pages = require("../src/background/pages.js");
+require("../src/background/anki.js");
 const background = require("../src/background/background.js");
 
 const PNG = "data:image/png;base64,dGVzdA==";
@@ -113,13 +113,45 @@ const selection = (overrides = {}) => ({
   ...overrides,
 });
 
+// Synthetic pre-inline-learning requests, used only to verify retained request recovery.
+async function legacyStudy(service, runId, regionId, retryJobId) {
+  const source = await service.source(runId);
+  const run = source?.result;
+  const selected = run?.analysis?.regions?.find((region) => region.id === regionId);
+  if (!selected) throw new Error("The selected text is no longer in the saved translation.");
+  return service.submit(
+    {
+      kind: "study",
+      model: run.model,
+      input: {
+        runId,
+        regionId,
+        captureId: run.capture_id,
+        source: {
+          context: run.context || "",
+          selection_transcript: run.analysis.regions.map((region) => ({
+            id: region.id,
+            japanese: region.japanese,
+          })),
+          selected: {
+            id: selected.id,
+            japanese: selected.japanese,
+            translation: selected.translation,
+          },
+        },
+      },
+    },
+    retryJobId,
+  );
+}
+
 module.exports = {
+  legacyStudy,
   storage,
   provider,
   settings,
   jobs,
   reader,
-  pages,
   background,
   IDBFactory,
   PNG,

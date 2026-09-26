@@ -12,9 +12,9 @@ const {
   rect,
 } = require("./core-helpers.cjs");
 
-async function seedVersionOne(factory, name, records) {
+async function seedVersionOne(factory, name, records, version = 1) {
   const db = await new Promise((resolve, reject) => {
-    const request = factory.open(name, 1);
+    const request = factory.open(name, version);
     request.onupgradeneeded = () => {
       const db = request.result;
       db.createObjectStore("jobs", { keyPath: "id" }).createIndex("runId", "runId", {
@@ -125,14 +125,13 @@ test("v1 migration removes completed cache once while preserving request intent 
   t.after(() => store.db?.close());
   await store.open();
 
-  assert.equal(store.db.version, 2);
+  assert.equal(store.db.version, 3);
   assert.equal(await store.get("jobs", "obsolete"), undefined);
   assert.equal(await store.get("jobs", "obsolete-study"), undefined);
   assert.equal(await store.get("jobs", "obsolete-no-run"), undefined);
   assert.equal(await store.lookup("key-obsolete"), undefined);
   assert.equal(await store.lookup("orphan-claim"), undefined);
-  assert.deepEqual(await store.all("pages"), []);
-  assert.deepEqual(await store.all("regions"), []);
+  assert.deepEqual([...store.db.objectStoreNames], ["claims", "jobs"]);
   assert.deepEqual(await store.get("jobs", failedGemini.id), failedGemini);
   for (const status of ["running", "interrupted", "queued", "failed"]) {
     const saved = await store.lookup("key-" + status);
@@ -156,8 +155,6 @@ test("v1 migration removes completed cache once while preserving request intent 
   const current = { ...completed("current"), status: "running" };
   delete current.result;
   delete current.runId;
-  current.associations[0].pageId = "current-page";
-  await store.savePage({ id: "current-page", imageDataUrl: PNG, viewport });
   await store.claim(current);
   await store.finish(current.id, { status: "completed", result: result(current) });
   store.db.close();
@@ -168,17 +165,33 @@ test("v1 migration removes completed cache once while preserving request intent 
     (await store.run(current.resultId)).result.analysis.regions[0].translation,
     "I'd better head home.",
   );
-  assert.ok(await store.get("pages", "current-page"));
-  assert.equal((await store.page("current-page")).regions.length, 1);
   assert.deepEqual(await store.get("jobs", failedGemini.id), failedGemini);
 });
 
-test("a fresh v2 cache keeps completed results after reopening", async (t) => {
+test("v2 upgrade removes only retired placement stores and preserves current answers and request claims", async (t) => {
+  const factory = new IDBFactory();
+  const saved = completed("current-format");
+  saved.result = result(saved);
+  const pending = { ...completed("pending"), status: "running" };
+  delete pending.result;
+  await seedVersionOne(factory, "upgrade-v2", [saved, pending], 2);
+  const store = new storage.MangaStore(factory, "upgrade-v2");
+  t.after(() => store.db?.close());
+  await store.open();
+  assert.equal(store.db.version, 3);
+  assert.deepEqual([...store.db.objectStoreNames], ["claims", "jobs"]);
+  assert.deepEqual(await store.lookup(saved.key), saved);
+  assert.equal((await store.lookup(pending.key)).status, "interrupted");
+  await store.prune(true);
+  assert.ok(await store.lookup(pending.key), "clearing still preserves unresolved paid intent");
+});
+
+test("a fresh cache keeps completed results after reopening", async (t) => {
   const factory = new IDBFactory();
   let store = new storage.MangaStore(factory, "fresh");
   t.after(() => store.db?.close());
   await store.open();
-  assert.equal(store.db.version, 2);
+  assert.equal(store.db.version, 3);
   const job = { ...completed("fresh-answer"), status: "running" };
   delete job.result;
   await store.claim(job);

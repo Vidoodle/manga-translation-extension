@@ -63,56 +63,15 @@
       for (const study of this.transient.values())
         if (study.kind === "study" && study.status === "completed" && study.input.runId === runId)
           result.studies[study.input.regionId] = study.result;
-      const association = job.associations?.[0] || {};
-      return { result, imageDataUrl: job.input.imageDataUrl, ...association };
+      return { result, imageDataUrl: job.input.imageDataUrl };
     }
 
-    async translation({
-      model,
-      imageDataUrl,
-      context = "",
-      association,
-      associations,
-      retryJobId,
-    }) {
+    async translation({ model, imageDataUrl, context = "", retryJobId }) {
       return this.submit(
         {
           kind: "translation",
           model,
           input: { imageDataUrl, context },
-          associations: associations || (association ? [association] : []),
-        },
-        retryJobId,
-      );
-    }
-
-    async study(runId, regionId, retryJobId) {
-      const source = await this.source(runId);
-      const run = source?.result;
-      const selected = run?.analysis?.regions?.find((region) => region.id === regionId);
-      if (!selected) throw new Error("The selected text is no longer in the saved translation.");
-      return this.submit(
-        {
-          kind: "study",
-          model: run.model,
-          associations: [],
-          input: {
-            runId,
-            regionId,
-            captureId: run.capture_id,
-            source: {
-              context: run.context || "",
-              selection_transcript: run.analysis.regions.map((region) => ({
-                id: region.id,
-                japanese: region.japanese,
-              })),
-              selected: {
-                id: selected.id,
-                japanese: selected.japanese,
-                translation: selected.translation,
-              },
-            },
-          },
         },
         retryJobId,
       );
@@ -127,7 +86,6 @@
           kind: job.kind,
           model: job.model,
           input: job.input,
-          associations: job.associations || [],
         },
         jobId,
       );
@@ -302,7 +260,6 @@
       return {
         imageDataUrl: job.input.imageDataUrl,
         job: await this.poll(job.id),
-        ...(job.associations?.[0] || {}),
       };
     }
   }

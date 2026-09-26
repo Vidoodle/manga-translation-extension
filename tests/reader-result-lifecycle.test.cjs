@@ -81,7 +81,7 @@ test("the result shows the whole selection with word help, one translation, and 
   assert.ok(japanese.every((node) => node.querySelector("button")));
   assert.equal(translations.length, 1);
   assert.equal(translations[0].textContent, "Natural 1\n\nNatural 2");
-  assert.match(env.text(env.overlay.ui.studyRoot), /First grammar.*Second grammar/);
+  assert.match(env.text(env.overlay.ui.grammarRoot), /First grammar.*Second grammar/);
   assert.doesNotMatch(
     env.text(env.overlay.ui.card),
     /Unwanted|Try another model|Select another area/,

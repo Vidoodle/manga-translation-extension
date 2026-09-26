@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   storage,
+  legacyStudy,
   provider,
   jobs,
   PNG,
@@ -45,7 +46,7 @@ test("saved failures expose their retained HTTP status without another provider 
   assert.equal(h.calls.length, 1);
 });
 
-test("concurrent duplicate selections share one durable request and retain both page associations", async (t) => {
+test("concurrent duplicate selections share one durable request", async (t) => {
   let release;
   const pending = new Promise((resolve) => {
     release = resolve;
@@ -57,15 +58,10 @@ test("concurrent duplicate selections share one durable request and retain both 
     },
   });
 
-  for (const pageId of ["page-a", "page-b"]) {
-    await h.store.savePage({ id: pageId, imageDataUrl: PNG, viewport, updatedAt: Date.now() });
-  }
-
-  const replies = await Promise.all(
-    ["page-a", "page-b"].map((pageId) =>
-      h.service.translation(selection({ association: { id: pageId, pageId, viewport, rect } })),
-    ),
-  );
+  const replies = await Promise.all([
+    h.service.translation(selection()),
+    h.service.translation(selection()),
+  ]);
   assert.equal(replies[0].jobId, replies[1].jobId);
   assert.equal(h.calls.length, 1);
   assert.equal((await h.store.get("jobs", replies[0].jobId)).status, "running");
@@ -73,12 +69,7 @@ test("concurrent duplicate selections share one durable request and retain both 
   release();
   await settle(h.service);
 
-  for (const pageId of ["page-a", "page-b"]) {
-    const page = await h.store.page(pageId);
-    assert.equal(page.regions.length, 1);
-    assert.equal(page.regions[0].imageDataUrl, PNG);
-  }
-  assert.equal((await h.store.all("regions"))[0].imageDataUrl, undefined);
+  assert.equal((await h.service.poll(replies[0].jobId)).status, "completed");
 });
 
 test("completed answers and study notes reopen offline without another provider request", async (t) => {
@@ -86,7 +77,7 @@ test("completed answers and study notes reopen offline without another provider 
   const submitted = await h.service.translation(selection());
   await settle(h.service);
   const run = (await h.service.poll(submitted.jobId)).result;
-  const study = await h.service.study(run.run_id, "bubble-1");
+  const study = await legacyStudy(h.service, run.run_id, "bubble-1");
   await settle(h.service);
 
   h.preferences.requireNetwork = async () => {
@@ -94,7 +85,7 @@ test("completed answers and study notes reopen offline without another provider 
   };
   h.preferences.key = async () => "";
   const cached = await h.service.translation(selection());
-  const cachedStudy = await h.service.study(run.run_id, "bubble-1");
+  const cachedStudy = await legacyStudy(h.service, run.run_id, "bubble-1");
   const reopened = await h.service.reopen(run.run_id);
 
   assert.equal(cached.cached, true);
@@ -149,7 +140,7 @@ test("study notes belong to their source run even when two crops produce identic
     await settle(h.service);
     const runId = (await h.service.poll(translated.jobId)).result.run_id;
     runIds.push(runId);
-    const study = await h.service.study(runId, "bubble-1");
+    const study = await legacyStudy(h.service, runId, "bubble-1");
     await settle(h.service);
     studyIds.push(study.jobId);
     assert.equal((await h.service.poll(study.jobId)).result.run_id, runId);
@@ -162,7 +153,7 @@ test("study notes belong to their source run even when two crops produce identic
   for (let index = 0; index < runIds.length; index++) {
     const reopened = await h.service.reopen(runIds[index]);
     assert.equal(reopened.result.studies["bubble-1"].run_id, runIds[index]);
-    const cached = await h.service.study(runIds[index], "bubble-1");
+    const cached = await legacyStudy(h.service, runIds[index], "bubble-1");
     assert.equal(cached.jobId, studyIds[index]);
     assert.equal(cached.cached, true);
   }
@@ -532,7 +523,7 @@ test("clear cache retains unresolved study, its source translation and retry inp
   const translated = await h.service.translation(selection());
   await settle(h.service);
   const run = (await h.service.poll(translated.jobId)).result;
-  const study = await h.service.study(run.run_id, "bubble-1");
+  const study = await legacyStudy(h.service, run.run_id, "bubble-1");
   await settle(h.service);
   await h.store.prune(true);
 
@@ -545,24 +536,6 @@ test("clear cache retains unresolved study, its source translation and retry inp
   assert.equal(history.result.run_id, run.run_id);
   assert.equal(history.studyJob.job_id, study.jobId);
   assert.equal(history.studyJob.regionId, "bubble-1");
-});
-
-test("alternative model answers keep separate saved regions for the same selected rectangle", async (t) => {
-  const h = await serviceHarness(t);
-  await h.store.savePage({ id: "page", imageDataUrl: PNG, viewport, updatedAt: Date.now() });
-  const association = { id: "same-area", pageId: "page", viewport, rect };
-  await h.service.translation(selection({ association }));
-  await settle(h.service);
-  await h.service.translation(selection({ association, model: "test/another" }));
-  await settle(h.service);
-
-  const page = await h.store.page("page");
-  assert.equal(page.regions.length, 2);
-  assert.equal(new Set(page.regions.map((region) => region.id)).size, 2);
-  assert.deepEqual(
-    new Set(page.regions.map((region) => region.model)),
-    new Set(["test/cheap", "test/another"]),
-  );
 });
 
 test("concurrent durable claims cannot exceed the unresolved request limit", async (t) => {

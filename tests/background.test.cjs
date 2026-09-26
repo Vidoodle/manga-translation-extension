@@ -1,4 +1,5 @@
 const test = require("node:test");
+const { legacyStudy } = require("./core-helpers.cjs");
 const assert = require("node:assert/strict");
 const {
   storage,
@@ -545,13 +546,7 @@ test("history and saved study remain accessible without setup while new paid act
   const h = await harness(t);
   const sessionId = await h.start();
   const translated = await translate(h, sessionId);
-  const study = await h.request({
-    type: "manga:study",
-    sessionId,
-    runId: translated.result.run_id,
-    regionId: "bubble-1",
-  });
-  assert.equal(study.ok, true);
+  const study = await legacyStudy(h.app.jobs, translated.result.run_id, "bubble-1");
   await settle(h.app.jobs);
   await h.popup("remove-key");
   h.local.selectedModel = "";
@@ -574,14 +569,8 @@ test("history and saved study remain accessible without setup while new paid act
   assert.equal(opened.history.imageDataUrl, PNG);
   assert.equal(h.calls.sent.length, sentBefore);
   assert.equal(h.calls.injected.length, injectedBefore);
-  const cached = await h.request({
-    type: "manga:study",
-    sessionId,
-    runId: translated.result.run_id,
-    regionId: "bubble-1",
-  });
-  assert.equal(cached.cached, true);
-  assert.equal(cached.jobId, study.jobId);
+  const cached = await h.request({ type: "manga:history", sessionId, id: study.jobId });
+  assert.equal(cached.ok, true);
   const compare = await h.request({
     type: "manga:analyze",
     sessionId,
@@ -629,7 +618,7 @@ test("opening an in-page saved translation grants only its ownership without set
     (await h.request({ type: "manga:poll", sessionId, jobId: saved.reply.jobId })).job.status,
     "completed",
   );
-  const foreign = await h.request({ type: "manga:reopen", sessionId, runId: "unowned-run" });
+  const foreign = await h.request({ type: "manga:anki-add", sessionId, runId: "unowned-run" });
   assert.equal(foreign.ok, false);
   assert.match(foreign.error, /does not belong to this reading session/);
   assert.deepEqual(
@@ -764,7 +753,6 @@ test("removing the key after activation blocks capture, translation, study and e
   for (const request of [
     { type: "manga:capture", viewport },
     { type: "manga:analyze", imageDataUrl: PNG, viewport, rect, context: "new" },
-    { type: "manga:study", runId: translated.result.run_id, regionId: "bubble-1" },
     { type: "manga:retry", jobId: failed.jobId },
   ]) {
     const response = await h.request({ ...request, sessionId });
@@ -907,7 +895,13 @@ test("restarting setup removes only key and model while saved translations and a
   assert.equal(h.local.selectedModel, undefined);
   assert.deepEqual(h.local.readerCardPosition, { x: 0.25, y: 0.75 });
   const config = (await h.popup("config")).config;
-  assert.deepEqual(config, { key_configured: false, model: "", shortcut: "Ctrl+Shift+U" });
+  assert.deepEqual(config, {
+    key_configured: false,
+    anki_enabled: false,
+    anki_setup_pending: false,
+    model: "",
+    shortcut: "Ctrl+Shift+U",
+  });
   assert.equal(h.calls.provider.length, providerCalls);
   assert.deepEqual(await h.app.store.stats(), before);
   assert.equal(
@@ -985,23 +979,10 @@ for (const kind of ["translation", "study"]) {
       },
     });
     const sessionId = await h.start();
-    const page = await h.request({
-      type: "manga:page-save",
-      sessionId,
-      page: { imageDataUrl: PNG, viewport, descriptor: { version: 1 } },
-    });
-    const translated = await translate(h, sessionId, {
-      context: "original context",
-      pageId: page.pageId,
-    });
+    const translated = await translate(h, sessionId, { context: "original context" });
     let jobId = translated.reply.jobId;
     if (kind === "study") {
-      const studying = await h.request({
-        type: "manga:study",
-        sessionId,
-        runId: translated.result.run_id,
-        regionId: "bubble-1",
-      });
+      const studying = await legacyStudy(h.app.jobs, translated.result.run_id, "bubble-1");
       jobId = studying.jobId;
       await settle(h.app.jobs);
     }
@@ -1323,13 +1304,13 @@ test("catalog failures identify their boundary without exposing response bodies 
   }
 });
 
-test("capture is active-tab only and throttles repeated visual checks", async (t) => {
+test("capture is active-tab only and throttles repeated captures", async (t) => {
   const h = await harness(t);
   const sessionId = await h.start();
   for (let index = 0; index < 3; index++) {
-    assert.equal((await h.request({ type: "manga:verify-capture", sessionId, viewport })).ok, true);
+    assert.equal((await h.request({ type: "manga:capture", sessionId, viewport })).ok, true);
   }
-  const throttled = await h.request({ type: "manga:verify-capture", sessionId, viewport });
+  const throttled = await h.request({ type: "manga:capture", sessionId, viewport });
   assert.equal(throttled.code, "capture-throttled");
   assert.ok(throttled.retryAfterMs >= 1000);
   h.setActive({ ...h.sender.tab, id: 999 });
@@ -1392,16 +1373,7 @@ test("dismissal leaves work running and a retained reader port reports its event
 test("model comparisons use the owned saved crop without a screenshot or current-page position", async (t) => {
   const h = await harness(t);
   const firstSession = await h.start();
-  const savedPage = await h.request({
-    type: "manga:page-save",
-    sessionId: firstSession,
-    page: { imageDataUrl: PNG, viewport, descriptor: { version: 1 } },
-  });
-  assert.equal(savedPage.ok, true, savedPage.error);
-  const original = await translate(h, firstSession, {
-    context: "Original context",
-    pageId: savedPage.pageId,
-  });
+  const original = await translate(h, firstSession, { context: "Original context" });
   const sessionId = firstSession;
   const compare = await h.request({
     type: "manga:analyze",
@@ -1419,13 +1391,7 @@ test("model comparisons use the owned saved crop without a screenshot or current
   assert.equal(h.calls.captures.length, 1);
   assert.equal(h.calls.provider[1].input.imageDataUrl, PNG);
   assert.equal(h.calls.provider[1].input.context, "Original context");
-  assert.deepEqual(h.calls.provider[1].associations, h.calls.provider[0].associations);
-  const saved = await h.app.store.page(savedPage.pageId);
-  assert.deepEqual(
-    new Set(saved.regions.map((region) => region.model)),
-    new Set(["test/cheap", "test/another"]),
-  );
-  assert.ok(saved.regions.every((region) => JSON.stringify(region.rect) === JSON.stringify(rect)));
+  assert.equal((await h.app.store.all("jobs")).length, 2);
   assert.equal(
     (
       await h.request({
@@ -1439,60 +1405,70 @@ test("model comparisons use the owned saved crop without a screenshot or current
   );
 });
 
-test("document scope includes hashed book identity and does not disclose private query tokens", async (t) => {
-  const h = await harness(t);
-  const a = await h.app.reader.scope("https://reader.example/read?book=a&token=private");
-  const b = await h.app.reader.scope("https://reader.example/read?book=b&token=private");
-  assert.notEqual(a, b);
-  assert.equal(a.includes("private"), false);
-  assert.match(a, /^https:\/\/reader.example\/read#scope=/);
-});
-
-test("saved page metadata preserves recognition boundaries and rejects a different document", async (t) => {
+test("removed page-reference messages cannot create or read saved placement", async (t) => {
   const h = await harness(t);
   const sessionId = await h.start();
-  const surface = { x: 20, y: 10, width: 500, height: 700, kind: "canvas", complete: true };
-  const saved = await h.request({
-    type: "manga:page-save",
-    sessionId,
-    page: {
-      imageDataUrl: PNG,
-      viewport,
-      surface,
-      descriptor: { version: 1, width: 500, height: 700, thumbnail: [12, 34], texture: 8 },
-    },
-  });
-  assert.equal(saved.ok, true, saved.error);
-
-  const list = await h.request({ type: "manga:page-list", sessionId });
-  assert.deepEqual(list.pages[0].surface, surface);
-  assert.equal(list.pages[0].imageDataUrl, undefined);
-  const reopened = await h.request({ type: "manga:page-get", sessionId, pageId: saved.pageId });
-  assert.deepEqual(reopened.page.surface, surface);
-  assert.equal(reopened.page.imageDataUrl, PNG);
-  await assert.rejects(
-    h.app.pages.get("https://different.example/book", saved.pageId),
-    /another reading document/,
-  );
-});
-
-test("a pruned page reference reports unavailable placement instead of an expired page id", async (t) => {
-  const h = await harness(t);
-  const sessionId = await h.start();
-  const prune = h.app.store.prune.bind(h.app.store);
-  h.app.store.prune = () => prune(true);
-
-  const saved = await h.request({
-    type: "manga:page-save",
-    sessionId,
-    page: { imageDataUrl: PNG, viewport, descriptor: { version: 1 } },
-  });
-  assert.equal(saved.ok, false);
-  assert.equal(saved.pageId, undefined);
-  assert.match(saved.error, /translate without saved page placement/);
-
-  h.app.store.prune = prune;
+  for (const type of [
+    "manga:page-list",
+    "manga:page-get",
+    "manga:page-save",
+    "manga:study",
+    "manga:reopen",
+    "manga:verify-capture",
+  ]) {
+    const response = await h.request({ type, sessionId });
+    assert.equal(response.ok, false);
+    assert.match(response.error, /Unknown reading request/);
+  }
   const translated = await translate(h, sessionId);
   assert.ok(translated.result.run_id);
   assert.equal(h.calls.provider.length, 1);
+});
+
+test("Anki mining authenticates the session and takes word data from its owned saved result", async (t) => {
+  const h = await harness(t);
+  const sessionId = await h.start();
+  const { result } = await translate(h, sessionId);
+  const mined = [];
+  h.app.anki.add = async (...args) => {
+    mined.push(args);
+    return { noteId: 42, deck: "Japanese" };
+  };
+  const message = {
+    type: "manga:anki-add",
+    sessionId,
+    runId: result.run_id,
+    regionIndex: 0,
+    wordIndex: 1,
+  };
+  assert.equal((await h.request({ ...message, sessionId: "fake" })).ok, false);
+  assert.equal((await h.request({ ...message, runId: "not-owned" })).ok, false);
+  assert.equal((await h.request({ type: "manga:popup-anki-save", config: {} })).ok, false);
+  assert.equal(mined.length, 0);
+  const response = await h.request({ ...message, result: { malicious: true } });
+  assert.equal(response.noteId, 42);
+  assert.equal(mined.length, 1);
+  assert.equal(mined[0][0].analysis.regions[0].words[1].surface, "帰らなきゃ");
+  assert.equal(h.calls.provider.length, 1, "mining makes no extra translation request");
+  await h.request({ type: "manga:cancel", sessionId });
+  assert.equal((await h.request(message)).ok, false);
+  assert.equal(mined.length, 1);
+});
+
+test("first model save offers optional Anki once, while existing users and model changes keep their setup", async (t) => {
+  const h = await harness(t, { stored: { selectedModel: "" } });
+  await h.popup("save-model", { model: "test/cheap" });
+  assert.equal((await h.popup("config")).config.anki_setup_pending, true);
+  await h.popup("save-model", { model: "test/cheap" });
+  assert.equal(h.local.ankiSetupPending, true);
+  await h.popup("finish-setup");
+  assert.equal((await h.popup("config")).config.anki_setup_pending, false);
+  await h.popup("save-model", { model: "test/cheap" });
+  assert.equal(h.local.ankiSetupPending, undefined);
+  assert.equal((await h.request({ type: "manga:popup-finish-setup" })).ok, false);
+  h.local.ankiSetupPending = true;
+  h.local.ankiMining = { enabled: true, deck: "Japanese" };
+  await h.popup("reset-setup");
+  assert.equal(h.local.ankiSetupPending, undefined);
+  assert.equal(h.local.ankiMining.enabled, true);
 });

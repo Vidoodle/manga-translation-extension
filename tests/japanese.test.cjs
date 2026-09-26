@@ -201,3 +201,148 @@ test("closed-shadow word help handles internal clicks and scrolling at its porta
   assert.equal(portal.listeners.get("pointerdown")?.has(help.onOutside), false);
   assert.equal(portal.listeners.get("scroll")?.has(help.onScroll), false);
 });
+
+const miningContext = {
+  runId: "r1",
+  regionIndex: 0,
+  japanese: "もう帰らなきゃ。",
+  translation: "I have to go.",
+};
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+test("mining requires an explicit click and keeps the pending/result state across word popups", async (t) => {
+  const { help, doc } = fixture(t);
+  let finish;
+  const calls = [];
+  help.mine = (context, edits) => {
+    calls.push({ context, edits });
+    return new Promise((resolve) => {
+      finish = resolve;
+    });
+  };
+  const paragraph = help.render(miningContext.japanese, vocabulary, miningContext);
+  doc.documentElement.append(paragraph);
+  const anchor = paragraph.querySelectorAll("button")[1];
+  anchor.dispatch("pointerenter");
+  assert.equal(calls.length, 0);
+  const add = help.tip.querySelectorAll("button")[0];
+  add.dispatch("click", { isTrusted: false });
+  assert.equal(calls.length, 0);
+  add.dispatch("click");
+  add.dispatch("click");
+  assert.equal(calls.length, 1);
+  assert.equal(add.disabled, true);
+  assert.deepEqual(calls[0].context, { runId: "r1", regionIndex: 0, wordIndex: 1 });
+  assert.equal(calls[0].edits.japanese, miningContext.japanese);
+  assert.equal(calls[0].edits.translation, miningContext.translation);
+  help.clear();
+  anchor.dispatch("click");
+  assert.equal(help.tip.querySelectorAll("button")[0].disabled, true);
+  finish({ deck: "Japanese" });
+  await flush();
+  assert.equal(help.tip.querySelectorAll("button")[0].attributes["aria-label"], "Added to Anki");
+  assert.equal(
+    help.tip.querySelectorAll("p").find((node) => node.className === "jp-status").textContent,
+    "Added to Japanese.",
+  );
+});
+
+test("Anki edits survive closing word help and uncertain outcomes disable repeated submission", async (t) => {
+  const { help, doc } = fixture(t);
+  const calls = [];
+  help.mine = async (context, edits) => {
+    calls.push(edits);
+    throw Object.assign(new Error("Check Anki before trying again."), { code: "anki-unknown" });
+  };
+  const paragraph = help.render(miningContext.japanese, vocabulary, miningContext);
+  doc.documentElement.append(paragraph);
+  const anchor = paragraph.querySelector("button");
+  anchor.dispatch("click");
+  help.tip.querySelectorAll("button")[1].dispatch("click");
+  const meaning = help.tip.querySelectorAll("textarea")[0];
+  meaning.value = "edited gloss";
+  meaning.dispatch("input");
+  const [submit, edit] = help.tip.querySelectorAll("button");
+  assert.equal(edit.hidden, true, "no separate Done action while editing");
+  assert.equal(doc.activeElement, help.tip.querySelectorAll("input")[0]);
+  assert.equal(submit.children[0].textContent, "Add to Anki");
+  assert.equal(calls.length, 0, "editing alone does not add a note");
+  help.clear();
+  anchor.dispatch("click");
+  const add = help.tip.querySelectorAll("button")[0];
+  add.dispatch("click");
+  await flush();
+  assert.equal(calls[0].meaning, "edited gloss");
+  assert.equal(add.disabled, true);
+  assert.match(
+    help.tip.querySelectorAll("p").find((node) => node.className === "jp-status").textContent,
+    /Check Anki/,
+  );
+});
+
+test("click pins the existing word popup across hover, focus and leave until explicit dismissal", async (t) => {
+  const { help, doc, portal } = fixture(t, undefined, true);
+  const paragraph = help.render(miningContext.japanese, vocabulary);
+  portal.append(paragraph);
+  const [first, second] = paragraph.querySelectorAll("button");
+  first.dispatch("pointerenter");
+  const tip = help.tip;
+  first.dispatch("click");
+  assert.equal(help.tip, tip, "pinning preserves the current popup");
+  assert.equal(first.attributes["data-pinned"], "");
+  first.dispatch("pointerleave");
+  first.dispatch("blur");
+  second.dispatch("pointerenter");
+  second.dispatch("focus");
+  second.dispatch("click", { isTrusted: false });
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  assert.equal(help.anchor, first);
+  assert.equal(help.tip, tip);
+  doc.dispatch("keydown", { key: "Escape" });
+  assert.equal(help.tip, null);
+  assert.equal(first.attributes["data-pinned"], undefined);
+  second.dispatch("pointerenter");
+  assert.equal(help.anchor, second, "dismissal restores hover previews");
+  second.dispatch("click");
+  first.dispatch("click");
+  assert.equal(help.anchor, first, "another explicit word click changes the pinned word");
+  assert.equal(second.attributes["data-pinned"], undefined);
+  portal.dispatch("pointerdown", { target: paragraph, composedPath: () => [paragraph, portal] });
+  assert.equal(help.tip, null);
+  assert.equal(first.attributes["data-pinned"], undefined);
+});
+
+test("crossing another word while reaching Anki actions keeps the chosen word and edits", async (t) => {
+  const { help, doc } = fixture(t);
+  const calls = [];
+  help.mine = async (context, edits) => {
+    calls.push({ context, edits });
+    return { deck: "Japanese" };
+  };
+  const paragraph = help.render(miningContext.japanese, vocabulary, miningContext);
+  doc.documentElement.append(paragraph);
+  const [first, second] = paragraph.querySelectorAll("button");
+  first.dispatch("pointerenter");
+  first.dispatch("click");
+  second.dispatch("pointerenter");
+  const tip = help.tip;
+  tip.querySelectorAll("button")[1].dispatch("click");
+  const meaning = tip.querySelectorAll("textarea")[0];
+  meaning.value = "edited first word";
+  meaning.dispatch("input");
+  second.dispatch("pointerenter");
+  assert.equal(help.tip, tip);
+  tip.querySelectorAll("button")[0].dispatch("click");
+  await flush();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].context.wordIndex, 2);
+  assert.equal(calls[0].edits.word, "もう");
+  assert.equal(calls[0].edits.meaning, "edited first word");
+  assert.equal(tip.querySelectorAll("button")[0].attributes["aria-label"], "Added to Anki");
+  assert.equal(
+    tip.querySelectorAll("textarea")[0].parent.parent.hidden,
+    true,
+    "successful add closes the editor",
+  );
+  assert.equal(tip.children[2].textContent, "edited first word");
+});

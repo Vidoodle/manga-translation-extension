@@ -10,9 +10,8 @@ Firefox hosts the extension. OpenRouter handles model requests. Selection, cropp
 | `background/jobs.js`           | Request identity, durable lifecycle, deduplication and explicit retry   | Browser DOM                                                 |
 | `background/store.js`          | IndexedDB transactions, migration, recovery and retention               | Requests or UI policy                                       |
 | `background/provider.js`       | Fixed endpoints, prompts/schema, streaming and validation               | Page coordinates or cache decisions                         |
-| `background/pages.js`          | Retained legacy page/region persistence routes                          | New reader selections                                       |
 | `reader/vision.js`             | Rectangle normalization, screenshot pixel bounds and card placement     | Page recognition or browser APIs                            |
-| `reader/page-tracker.js`       | Serialized explicit capture and selected-size crop export               | Matching, history lookup or model policy                    |
+| `reader/selection-capture.js`       | Serialized explicit capture and selected-size crop export               | Matching, history lookup or model policy                    |
 | `reader/reader-view.js`        | Safe DOM rendering, draggable card and word help                        | Requests or persistence decisions                           |
 | `reader/content.js`            | Selection/session lifecycle and request coordination                    | Database or provider implementation                         |
 | `popup/popup.js`               | Setup, model choice and settings                                        | Reading UI, direct credential persistence or provider calls |
@@ -36,7 +35,7 @@ The selection layer mounts without a screenshot or saved-page query. Dragging up
 
 Coordinate conversion uses the actual screenshot-to-viewport ratio. Arithmetic noise at integer pixel boundaries is removed before outward rounding; real fractional edges are preserved.
 
-There is no in-page reference matching, saved outline, snapping or periodic capture. New selections create no page reference/region association. Legacy page routes remain in the backend for now and are not called by the new reader flow.
+There is no in-page reference matching, saved outline, snapping or periodic capture. New selections create no page reference/region association. The page service, message routes and placement stores were removed in 0.5.6.
 
 Each selection owns its state and pending-operation guards. Async work retains its original selection revision so late output cannot overwrite a newer selection. An open card retains its original crop while the reader scrolls or changes. Resizing/fullscreen changes reposition the card; they do not recapture it. Trusted header dragging persists a normalized position.
 
@@ -58,7 +57,7 @@ Translation regions contain Japanese, one natural-English translation, contextua
 
 A document port and heartbeat support work after ordinary card dismissal. They do not guarantee survival of tab/browser closure or process failure. Losing that port does not stop status polling over runtime messages or imply a failed request. Actual status-message errors show **Check again**, which reads the existing job without resubmitting it. Completion that cannot be persisted stays available in memory with an explicit warning. An explicit retry must first persist a previously unsaved failure; late outcome reconciliation cannot overwrite a newer attempt.
 
-Legacy study/retry records remain supported for durable request recovery. Their identity includes the original translation/text group. New word help and grammar arrive in the initial translation request.
+New word help and grammar arrive in the initial translation request. The old study-creation route and builder are removed. Existing study records can still be read, polled and explicitly retried through the common durable request service; these recovery paths preserve previously paid request intent rather than creating a second learning workflow.
 
 ## Popup and settings
 
@@ -76,9 +75,9 @@ The in-page library requests history through authenticated reader messages. Choo
 
 ## Migration and retention
 
-The existing `manga-reader-v3` IndexedDB database upgrades from version 1 to 2. The upgrade removes old completed requests and their claims, except source translations needed by non-completed request records. All old page references and regions are cleared. Non-completed records and their retained claims survive. Credentials/preferences live in extension settings and are unaffected.
+The `manga-reader-v3` IndexedDB database uses schema version 3. Upgrading from version 2 deletes only obsolete page and region stores; jobs and claims remain intact. Version-1 databases also receive the historical answer-format reset, preserving non-completed requests and required source translations. Credentials/preferences live in extension settings and are unaffected.
 
-The upgrade runs once, not on every startup. New completed answers persist across reopening. Normal retention bounds ordinary jobs to 200 entries / 120 MiB; legacy page records also share a 160 MiB total budget. Active/interrupted records and required sources remain protected. New submissions also pass a storage admission check. Explicit clearing removes ordinary saved data while preserving unresolved work.
+The upgrade runs once, not on every startup. New completed answers persist across reopening. Normal retention bounds ordinary jobs to 200 entries / 120 MiB. Active/interrupted records and required sources remain protected. New submissions also pass a storage admission check. Explicit clearing removes ordinary saved data while preserving unresolved work.
 
 Storage, injection, capture and crop errors identify their failed boundary and retain the underlying cause. Cache failures do not prevent independent key/model/shortcut settings from working.
 
@@ -87,3 +86,9 @@ Storage, injection, capture and crop errors identify their failed boundary and r
 Keep rendering separate from request/persistence policy. Keep geometry helpers independent of browser APIs. Tests should cover request counts, state ownership, precise crop pixels, failure recovery and durable data. Do not keep unused visual-matching algorithms merely because their unit tests still pass.
 
 Synthetic fixtures are useful for these contracts. Installed Firefox/BookWalker and paid model quality require separate acceptance evidence.
+
+## Anki mining
+
+`background/anki.js` owns the fixed loopback AnkiConnect v6 transport, credentials, mapping validation and note creation. Only authenticated popup messages configure it. Reading messages must own their source run; the background loads its saved result and resolves the word by region/word index before applying bounded user edits. The reader never chooses an API action, endpoint, note type or deck. Fields are HTML escaped and duplicate rejection stays enabled. Concurrent identical adds share one pending operation; ambiguous outcomes never retry automatically.
+
+`popup/anki-settings.js` shares one configuration form between the final optional onboarding step and Settings. The first saved model records `ankiSetupPending`; reopening resumes Anki until the user saves or skips. Existing configured installations have no pending flag, and later model changes do not restart setup. `shared/japanese.js` adds mining and editing to word help only when enabled. Per-word state preserves pending, success and error feedback across popup closure; translation requests and cache keys are unchanged.

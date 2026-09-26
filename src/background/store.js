@@ -1,4 +1,4 @@
-/* Durable request intent, answers and local page references. No credentials. */
+/* Durable request intent, answers. No credentials. */
 (() => {
   "use strict";
 
@@ -27,7 +27,7 @@
     return bytes;
   }
 
-  function retentionPlan(jobs, pages, regions, clear) {
+  function retentionPlan(jobs, clear) {
     const jobIds = new Set(jobs.filter(unresolved).map((job) => job.id));
     const requiredRuns = new Set(
       jobs
@@ -37,16 +37,9 @@
     );
     for (const job of jobs) if (requiredRuns.has(job.runId)) jobIds.add(job.id);
 
-    const protectedJobs = jobs.filter((job) => jobIds.has(job.id));
-    const pageIds = new Set(
-      protectedJobs
-        .flatMap((job) => job.associations || [])
-        .map((item) => item.pageId)
-        .filter(Boolean),
-    );
     // Unresolved records have their own admission limit. They must not consume
     // the ordinary cache budget and immediately evict a newly completed answer.
-    let bytes = retainRecent(jobs, jobIds, 120 * 1024 * 1024, 0, 200, clear);
+    retainRecent(jobs, jobIds, 120 * 1024 * 1024, 0, 200, clear);
 
     // Study entries retain source identity and never outlive an evicted source run.
     const retainedRuns = new Set(
@@ -60,21 +53,7 @@
         jobIds.delete(job.id);
     }
 
-    const protectedRuns = new Set(protectedJobs.map((job) => job.runId).filter(Boolean));
-    bytes += estimate(
-      regions.filter(
-        (region) =>
-          retainedRuns.has(region.runId) &&
-          !(protectedRuns.has(region.runId) && pageIds.has(region.pageId)),
-      ),
-    );
-    retainRecent(pages, pageIds, 160 * 1024 * 1024, bytes, 150, clear);
-    const regionIds = new Set(
-      regions
-        .filter((region) => retainedRuns.has(region.runId) && pageIds.has(region.pageId))
-        .map((region) => region.id),
-    );
-    return { jobIds, pageIds, regionIds };
+    return jobIds;
   }
 
   class StoreError extends Error {
@@ -94,17 +73,14 @@
     async open() {
       if (this.db) return this;
       this.db = await new Promise((resolve, reject) => {
-        const request = this.indexedDB.open(this.name, 2);
+        const request = this.indexedDB.open(this.name, 3);
         request.onupgradeneeded = (event) => {
           const db = request.result;
           if (event.oldVersion === 0) {
             const jobs = db.createObjectStore("jobs", { keyPath: "id" });
             jobs.createIndex("runId", "runId", { unique: true });
             db.createObjectStore("claims", { keyPath: "key" });
-            db.createObjectStore("pages", { keyPath: "id" });
-            const regions = db.createObjectStore("regions", { keyPath: "id" });
-            regions.createIndex("pageId", "pageId");
-          } else {
+          } else if (event.oldVersion === 1) {
             // One-time answer-format reset. Request intent and any source needed
             // for its deliberate retry survive; no credentials live in this DB.
             const tx = request.transaction;
@@ -128,9 +104,10 @@
                 cursor.continue();
               };
             };
-            tx.objectStore("pages").clear();
-            tx.objectStore("regions").clear();
           }
+          // Page matching was removed; preserve answers and paid-request intent.
+          for (const name of ["pages", "regions"])
+            if (db.objectStoreNames.contains(name)) db.deleteObjectStore(name);
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error || new Error("Local cache unavailable."));
@@ -226,78 +203,63 @@
     }
     // A single read/write transaction serializes claims even across multiple tabs.
     async claim(candidate, retryJobId, allowCreate = true) {
-      const claimed = await this.transaction(
-        ["claims", "jobs", "regions"],
-        "readwrite",
-        (tx, done) => {
-          const claims = tx.objectStore("claims");
-          const jobs = tx.objectStore("jobs");
-          const lookup = (original) => {
-            const found = claims.get(candidate.key);
-            found.onsuccess = () => {
-              const put = () => {
-                if (original?.supersededBy)
-                  return done({
-                    error:
-                      "This attempt was already retried. Open its newer request from Saved translations.",
-                  });
-                return allowCreate
-                  ? this.insertClaim(tx, candidate, original, done)
-                  : done({ missing: true });
-              };
-              if (!found.result) return put();
-              const request = jobs.get(found.result.jobId);
-              request.onsuccess = () => {
-                const existing = request.result;
-                if (!existing) return put();
-                if (
-                  retryJobId === existing.id &&
-                  ["failed", "interrupted"].includes(existing.status)
-                ) {
-                  return put();
-                }
-                // A prompt/schema upgrade changes the claim key. A deliberate
-                // retry must still resolve the older intent, even when it joins
-                // an already-running or cached request under the new key.
-                if (original && original.id !== existing.id && !original.supersededBy)
-                  this.supersede(jobs, original, existing.id);
-                if (candidate.associations?.length) {
-                  existing.associations ||= [];
-                  for (const association of candidate.associations) {
-                    if (
-                      !existing.associations.some((item) => item.id === association.id) &&
-                      existing.associations.length < 100
-                    )
-                      existing.associations.push(association);
-                    if (existing.status === "completed") this.putRegion(tx, existing, association);
-                  }
-                }
-                existing.accessedAt = Date.now();
-                jobs.put(existing);
-                done({ job: existing, created: false });
-              };
+      const claimed = await this.transaction(["claims", "jobs"], "readwrite", (tx, done) => {
+        const claims = tx.objectStore("claims");
+        const jobs = tx.objectStore("jobs");
+        const lookup = (original) => {
+          const found = claims.get(candidate.key);
+          found.onsuccess = () => {
+            const put = () => {
+              if (original?.supersededBy)
+                return done({
+                  error:
+                    "This attempt was already retried. Open its newer request from Saved translations.",
+                });
+              return allowCreate
+                ? this.insertClaim(tx, candidate, original, done)
+                : done({ missing: true });
+            };
+            if (!found.result) return put();
+            const request = jobs.get(found.result.jobId);
+            request.onsuccess = () => {
+              const existing = request.result;
+              if (!existing) return put();
+              if (
+                retryJobId === existing.id &&
+                ["failed", "interrupted"].includes(existing.status)
+              ) {
+                return put();
+              }
+              // A prompt/schema upgrade changes the claim key. A deliberate
+              // retry must still resolve the older intent, even when it joins
+              // an already-running or cached request under the new key.
+              if (original && original.id !== existing.id && !original.supersededBy)
+                this.supersede(jobs, original, existing.id);
+              existing.accessedAt = Date.now();
+              jobs.put(existing);
+              done({ job: existing, created: false });
             };
           };
-          if (!retryJobId) lookup();
-          else {
-            const request = jobs.get(retryJobId);
-            request.onsuccess = () => {
-              const original = request.result;
-              if (
-                !original ||
-                !["failed", "interrupted"].includes(original.status) ||
-                original.kind !== candidate.kind ||
-                original.model !== candidate.model ||
-                JSON.stringify(original.input) !== JSON.stringify(candidate.input)
-              )
-                return done({
-                  error: "The original request is no longer available for this retry.",
-                });
-              lookup(original);
-            };
-          }
-        },
-      );
+        };
+        if (!retryJobId) lookup();
+        else {
+          const request = jobs.get(retryJobId);
+          request.onsuccess = () => {
+            const original = request.result;
+            if (
+              !original ||
+              !["failed", "interrupted"].includes(original.status) ||
+              original.kind !== candidate.kind ||
+              original.model !== candidate.model ||
+              JSON.stringify(original.input) !== JSON.stringify(candidate.input)
+            )
+              return done({
+                error: "The original request is no longer available for this retry.",
+              });
+            lookup(original);
+          };
+        }
+      });
 
       if (claimed.error) throw new StoreError(claimed.error);
       return claimed;
@@ -338,20 +300,8 @@
       });
     }
 
-    putRegion(tx, job, association) {
-      if (job.kind !== "translation" || !association.pageId || !job.result) return;
-      tx.objectStore("regions").put({
-        ...association,
-        id: association.id + ":" + job.result.run_id,
-        runId: job.result.run_id,
-        model: job.model,
-        context: job.input.context,
-        createdAt: job.createdAt,
-      });
-    }
-
     finish(id, changes) {
-      return this.transaction(["jobs", "regions"], "readwrite", (tx, done) => {
+      return this.transaction(["jobs"], "readwrite", (tx, done) => {
         const store = tx.objectStore("jobs");
         const request = store.get(id);
         request.onsuccess = () => {
@@ -369,8 +319,6 @@
           Object.assign(job, changes, { updatedAt: Date.now(), accessedAt: Date.now() });
           if (job.kind === "translation" && changes.result) job.runId = changes.result.run_id;
           store.put(job);
-          if (job.status === "completed")
-            for (const association of job.associations || []) this.putRegion(tx, job, association);
           done(job);
         };
       });
@@ -391,38 +339,11 @@
       return result;
     }
 
-    async page(id) {
-      const [page, regions] = await Promise.all([
-        this.get("pages", id),
-        this.transaction(["regions"], "readonly", (tx, done) => {
-          const request = tx.objectStore("regions").index("pageId").getAll(id);
-          request.onsuccess = () => done(request.result);
-        }),
-      ]);
-      const sources = new Map();
-      for (const region of regions) {
-        if (!sources.has(region.runId)) sources.set(region.runId, await this.run(region.runId));
-        region.imageDataUrl = sources.get(region.runId)?.input.imageDataUrl;
-      }
-      return { page, regions: regions.filter((region) => region.imageDataUrl) };
-    }
-
-    savePage(page) {
-      return this.transaction(["pages"], "readwrite", (tx, done) => {
-        tx.objectStore("pages").put(page);
-        done(page.id);
-      });
-    }
-
     async stats() {
-      const [jobs, pages, regions] = await Promise.all(
-        ["jobs", "pages", "regions"].map((name) => this.all(name)),
-      );
+      const jobs = await this.all("jobs");
       return {
         entries: jobs.filter((job) => job.status === "completed").length,
-        pages: pages.length,
-        regions: regions.length,
-        bytes: estimate(jobs) + estimate(pages) + estimate(regions),
+        bytes: estimate(jobs),
         unresolved: jobs.filter(unresolved).length,
       };
     }
@@ -451,40 +372,26 @@
     }
 
     async prune(clear = false) {
-      // Keep unresolved inputs and their source pages/runs even when clearing cache.
-      return this.transaction(["jobs", "claims", "pages", "regions"], "readwrite", (tx, done) => {
-        const jobsStore = tx.objectStore("jobs");
-        const pagesStore = tx.objectStore("pages");
-        const regionsStore = tx.objectStore("regions");
-        const requests = [jobsStore.getAll(), pagesStore.getAll(), regionsStore.getAll()];
-        let loaded = 0;
-        requests.forEach((request) => {
-          request.onsuccess = () => {
-            if (++loaded !== 3) return;
-            const [jobs, pages, regions] = requests.map((item) => item.result);
-            const plan = retentionPlan(jobs, pages, regions, clear);
-            this.applyRetention(tx, { jobs, pages, regions }, plan);
-            done(true);
-          };
-        });
+      // Keep unresolved inputs and required source runs even when clearing cache.
+      return this.transaction(["jobs", "claims"], "readwrite", (tx, done) => {
+        const store = tx.objectStore("jobs");
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const jobs = request.result;
+          const retained = retentionPlan(jobs, clear);
+          for (const job of jobs) if (!retained.has(job.id)) store.delete(job.id);
+          this.pruneClaims(tx, retained);
+          done(true);
+        };
       });
     }
 
-    applyRetention(tx, records, plan) {
-      for (const [name, retained] of [
-        ["jobs", plan.jobIds],
-        ["pages", plan.pageIds],
-        ["regions", plan.regionIds],
-      ]) {
-        const store = tx.objectStore(name);
-        for (const record of records[name]) if (!retained.has(record.id)) store.delete(record.id);
-      }
-
+    pruneClaims(tx, retained) {
       const request = tx.objectStore("claims").openCursor();
       request.onsuccess = () => {
         const cursor = request.result;
         if (!cursor) return;
-        if (!plan.jobIds.has(cursor.value.jobId)) cursor.delete();
+        if (!retained.has(cursor.value.jobId)) cursor.delete();
         cursor.continue();
       };
     }

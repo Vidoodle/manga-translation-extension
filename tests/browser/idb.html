@@ -38,7 +38,6 @@
         input: { imageDataUrl: "fixture-image", context: "" },
         createdAt: Date.now(),
         accessedAt: Date.now(),
-        associations: [],
         ...extra,
       });
       async function test(name, run) {
@@ -121,23 +120,12 @@
           "New context reused old answer",
         );
       });
-      await test("Clear cache preserves unresolved requests and their source page", async () => {
-        await store.savePage({
-          id: "pending-page",
-          scope: "fixture",
-          imageDataUrl: "page-image",
-          updatedAt: Date.now(),
-        });
-        await store.claim(
-          candidate("with-page", "page-key", {
-            associations: [
-              { id: "region-1", pageId: "pending-page", rect: { x: 1, y: 2, width: 3, height: 4 } },
-            ],
-          }),
-        );
+      await test("Clear cache preserves unresolved requests and their input", async () => {
+        await store.claim(candidate("pending", "pending-key"));
         await store.prune(true);
-        assert((await store.get("jobs", "with-page")).status === "running", "Live request removed");
-        assert((await store.page("pending-page")).page, "Source page removed");
+        const pending = await store.get("jobs", "pending");
+        assert(pending.status === "running", "Live request removed");
+        assert(pending.input.imageDataUrl === "fixture-image", "Retry input removed");
         assert(!(await store.run("saved-run")), "Completed answer not cleared");
       });
       const passed = results.filter((r) => r.passed).length;

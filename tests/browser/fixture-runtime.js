@@ -73,6 +73,14 @@
     openRouterApiKey: "synthetic-fixture-key",
     selectedModel: "fixture/one",
   };
+  if (query.has("anki"))
+    local.ankiMining = {
+      enabled: true,
+      deck: "Japanese",
+      model: "Basic",
+      mapping: { Front: ["word"], Back: ["reading", "meaning", "japanese", "translation"] },
+    };
+  const ankiNotes = new Map();
   const session = {};
   function area(data, persist = false) {
     return {
@@ -123,7 +131,7 @@
   const popupSender = () => ({ id: "fixture-extension", url: origin + "/src/popup/popup.html" });
   async function route(message, sender) {
     if (!onMessage.listeners[0]) throw new Error("Background has not registered");
-    if (captureBlocked && ["manga:capture", "manga:verify-capture"].includes(message.type))
+    if (captureBlocked && message.type === "manga:capture")
       return {
         ok: false,
         code: "screenshot-crop",
@@ -163,6 +171,9 @@
     },
     storage: { local: area(local, true), session: area(session) },
     permissions: {
+      async remove() {
+        return true;
+      },
       async contains() {
         return true;
       },
@@ -313,6 +324,28 @@
     pricing: { prompt: "0.0000001", completion: "0.0000005" },
   });
   window.fetch = async (url, options = {}) => {
+    if (String(url) === "http://127.0.0.1:8765") {
+      const { action, params } = JSON.parse(options.body);
+      if (query.get("anki") === "offline") throw new TypeError("Failed to fetch");
+      let result,
+        error = null;
+      if (action === "requestPermission") result = { permission: "granted", version: 6 };
+      if (action === "deckNames") result = ["Japanese"];
+      if (action === "modelNames") result = ["Basic"];
+      if (action === "modelFieldNames") result = ["Front", "Back"];
+      if (action === "addNote") {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        if (ankiNotes.has(params.note.fields.Front))
+          error = "cannot create note because it is a duplicate";
+        else {
+          result = Date.now();
+          ankiNotes.set(params.note.fields.Front, params.note);
+        }
+      }
+      return new Response(JSON.stringify({ result: result ?? null, error }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (String(url) === "https://openrouter.ai/api/v1/models")
       return new Response(
         JSON.stringify({

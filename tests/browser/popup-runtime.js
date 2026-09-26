@@ -9,6 +9,7 @@
     key_configured: !firstRun && scenario !== "key-removed",
     model: firstRun || scenario === "catalog-error" ? "" : "google/gemini-3-flash-preview",
     shortcut: "Alt+Q",
+    anki_setup_pending: scenario === "anki-setup",
   };
   const persistSettings = () => sessionStorage.setItem(settingsKey, JSON.stringify(settings));
   let permission = !["setup", "permission-denied"].includes(scenario);
@@ -112,6 +113,31 @@
     // Log only the message type. In particular, never store a pasted key in fixture state.
     calls.push(message.type);
     switch (message.type) {
+      case "manga:popup-anki-config":
+        return { ok: true, config: settings.anki || {} };
+      case "manga:popup-anki-connect":
+        return {
+          ok: true,
+          decks: ["Japanese", "Japanese::Manga"],
+          models: ["Basic", "Japanese vocabulary"],
+        };
+      case "manga:popup-anki-fields":
+        return {
+          ok: true,
+          fields:
+            message.model === "Basic"
+              ? ["Front", "Back"]
+              : ["Word", "Reading", "Meaning", "Japanese context", "Full translation"],
+        };
+      case "manga:popup-anki-save":
+        settings.anki = { ...message.config, enabled: true };
+        persistSettings();
+        return { ok: true };
+      case "manga:popup-anki-disconnect":
+        delete settings.anki;
+        persistSettings();
+        return { ok: true };
+
       case "manga:popup-config":
         return { ok: true, config: copy(settings) };
       case "manga:popup-models":
@@ -121,7 +147,12 @@
             error: "OpenRouter could not be reached. Check your connection and try again.",
           };
         return { ok: true, catalog: copy(catalog) };
+      case "manga:popup-finish-setup":
+        settings.anki_setup_pending = false;
+        persistSettings();
+        return { ok: true };
       case "manga:popup-save-model": {
+        if (!settings.model) settings.anki_setup_pending = true;
         if (!catalog.models.some((model) => model.id === message.model))
           return { ok: false, error: "Unknown fixture model." };
         settings.model = message.model;
@@ -142,6 +173,7 @@
       case "manga:popup-reset-setup":
         settings.key_configured = false;
         settings.model = "";
+        settings.anki_setup_pending = false;
         persistSettings();
         return { ok: true };
       case "manga:popup-shortcut":
@@ -172,6 +204,9 @@
       },
     },
     permissions: {
+      async remove() {
+        return true;
+      },
       async contains() {
         return permission;
       },
